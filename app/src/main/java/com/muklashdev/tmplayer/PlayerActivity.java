@@ -46,11 +46,10 @@ public class PlayerActivity extends Activity implements TextureView.SurfaceTextu
     private MediaPlayer mp;
     private TextureView surface;
     private Surface videoSurface;
-    private TextView hdrBtn;
     private int hdrMode = 0; // 0 off, 1 enhance, 2 vivid
     private FrameLayout surfaceContainer;
     private View topBar, centerControls, bottomBar;
-    private TextView titleTv, gestureLabel, subtitleTv, timeCur, timeTotal;
+    private TextView titleTv, folderTv, gestureLabel, subtitleTv, timeLabel;
     private TextView statusOverlay;
     private boolean pipMode = false;
     private boolean lpActive = false;
@@ -72,9 +71,13 @@ public class PlayerActivity extends Activity implements TextureView.SurfaceTextu
             }
         }
     };
-    private TextView speedBtn, resizeBtn, lockBtn, qualityLabel, unlockBtn;
-    private TextView bgBtn, repeatBtn, shuffleBtn;
-    private android.widget.ImageButton topBgBtn, sideMuteBtn;
+    private TextView speedBtn, unlockBtn;
+    private android.widget.ImageButton resizeBtn, lockBtn;
+    private android.widget.ImageButton bgBtn, repeatBtn, shuffleBtn;
+    private android.widget.ImageButton sideMuteBtn;
+    private android.media.audiofx.LoudnessEnhancer enhancer;
+    private android.content.BroadcastReceiver noisyReceiver;
+    private AudioManager focusAm;
     private boolean muted = false;
     private final Handler sleepUi = new Handler(Looper.getMainLooper());
     private Runnable sleepTask;
@@ -82,6 +85,21 @@ public class PlayerActivity extends Activity implements TextureView.SurfaceTextu
     private int repeatMode = 0; // 0 off, 1 all, 2 one
     private boolean shuffle = false;
     private ImageButton playBtn;
+    private final AudioManager.OnAudioFocusChangeListener focusListener =
+            new AudioManager.OnAudioFocusChangeListener() {
+                @Override public void onAudioFocusChange(int change) {
+                    if ((change == AudioManager.AUDIOFOCUS_LOSS
+                            || change == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT)
+                            && mp != null && prepared) {
+                        try {
+                            if (mp.isPlaying()) {
+                                mp.pause();
+                                playBtn.setImageResource(R.drawable.ic_play);
+                            }
+                        } catch (Exception ignored) {}
+                    }
+                }
+            };
     private SeekBar seekBar;
 
     private VideoItem item;
@@ -130,21 +148,19 @@ public class PlayerActivity extends Activity implements TextureView.SurfaceTextu
         titleTv = findViewById(R.id.player_title);
         gestureLabel = findViewById(R.id.gesture_label);
         subtitleTv = findViewById(R.id.subtitle_text);
-        timeCur = findViewById(R.id.time_current);
-        timeTotal = findViewById(R.id.time_total);
+        timeLabel = findViewById(R.id.time_label);
+        folderTv = findViewById(R.id.player_folder);
         seekBar = findViewById(R.id.seek_bar);
         playBtn = findViewById(R.id.btn_play);
         speedBtn = findViewById(R.id.btn_speed);
         resizeBtn = findViewById(R.id.btn_resize);
         lockBtn = findViewById(R.id.btn_lock);
-        qualityLabel = findViewById(R.id.quality_label);
         unlockBtn = findViewById(R.id.btn_unlock);
 
         item = PlayQueue.current();
         if (item == null) { finish(); return; }
-        titleTv.setText(item.name);
-        speedBtn.setText(trimFloat(speed) + "x");
-        resizeBtn.setText(Prefs.RESIZE_NAMES[resizeMode]);
+        updateTitle();
+        speedBtn.setText(fmtSpeedLabel());
 
         findViewById(R.id.btn_back).setOnClickListener(v -> finish());
         playBtn.setOnClickListener(v -> togglePlay());
@@ -153,7 +169,7 @@ public class PlayerActivity extends Activity implements TextureView.SurfaceTextu
         speedBtn.setOnClickListener(v -> cycleSpeed());
         resizeBtn.setOnClickListener(v -> {
             resizeMode = (resizeMode + 1) % 3;
-            resizeBtn.setText(Prefs.RESIZE_NAMES[resizeMode]);
+            toast("Screen mode: " + Prefs.RESIZE_NAMES[resizeMode]);
             applySurfaceSize();
             showControls();
         });
@@ -161,8 +177,6 @@ public class PlayerActivity extends Activity implements TextureView.SurfaceTextu
         repeatBtn = findViewById(R.id.btn_repeat);
         shuffleBtn = findViewById(R.id.btn_shuffle);
         bgBtn.setOnClickListener(v -> toggleBg());
-        topBgBtn = findViewById(R.id.btn_top_bg);
-        topBgBtn.setOnClickListener(v -> toggleBg());
         findViewById(R.id.btn_top_queue).setOnClickListener(v -> showQueue());
         findViewById(R.id.btn_top_more).setOnClickListener(v -> showMoreMenu(v));
         sideMuteBtn = findViewById(R.id.btn_side_mute);
@@ -177,19 +191,33 @@ public class PlayerActivity extends Activity implements TextureView.SurfaceTextu
         });
         repeatBtn.setOnClickListener(v -> {
             repeatMode = (repeatMode + 1) % 3;
-            repeatBtn.setText(repeatMode == 1 ? "Repeat: All" : repeatMode == 2 ? "Repeat: One" : "Repeat: Off");
-            repeatBtn.setTextColor(repeatMode != 0 ? prefs.accent() : 0xFFFFFFFF);
+            repeatBtn.setColorFilter(repeatMode != 0 ? prefs.accent() : 0x99FFFFFF);
+            toast(repeatMode == 1 ? "Repeat: All" : repeatMode == 2 ? "Repeat: One" : "Repeat: Off");
             showControls();
         });
         shuffleBtn.setOnClickListener(v -> {
             shuffle = !shuffle;
-            shuffleBtn.setTextColor(shuffle ? prefs.accent() : 0xFFFFFFFF);
+            shuffleBtn.setColorFilter(shuffle ? prefs.accent() : 0x99FFFFFF);
             showControls();
         });
         lockBtn.setOnClickListener(v -> setLocked(true));
         unlockBtn.setOnClickListener(v -> setLocked(false));
         statusOverlay = findViewById(R.id.status_overlay);
-        subtitleTv.setTextSize(prefs.subtitleSize() == 0 ? 14f : prefs.subtitleSize() == 2 ? 21f : 17f);
+        subtitleTv.setTextSize(prefs.subTextSize());
+        {
+            android.graphics.Typeface fam = prefs.subFont() == 1 ? android.graphics.Typeface.SANS_SERIF
+                    : prefs.subFont() == 2 ? android.graphics.Typeface.SERIF
+                    : prefs.subFont() == 3 ? android.graphics.Typeface.MONOSPACE
+                    : android.graphics.Typeface.DEFAULT;
+            subtitleTv.setTypeface(fam, prefs.subBold()
+                    ? android.graphics.Typeface.BOLD : android.graphics.Typeface.NORMAL);
+            if (prefs.subBg()) {
+                subtitleTv.setBackgroundColor(0x99000000);
+                int px = (int) (10 * getResources().getDisplayMetrics().density);
+                int py = (int) (3 * getResources().getDisplayMetrics().density);
+                subtitleTv.setPadding(px, py, px, py);
+            }
+        }
         findViewById(R.id.btn_rotate).setOnClickListener(v -> {
             if (prefs.orientLock()) {
                 toast("Screen orientation is locked — change it in Settings → Video");
@@ -203,8 +231,8 @@ public class PlayerActivity extends Activity implements TextureView.SurfaceTextu
         // Colourful controls: every player icon gets its own friendly colour.
         tint(R.id.btn_back, 0xFF4FC3F7);
         tint(R.id.btn_shot, 0xFFFFB74D);
-        tint(R.id.btn_top_bg, 0xFF81C784);
         tint(R.id.btn_top_queue, 0xFFBA68C8);
+        tint(R.id.btn_subtitle, 0xFF4DB6AC);
         tint(R.id.btn_top_more, 0xFFFFCA28);
         tint(R.id.btn_rotate, 0xFF4DB6AC);
         tint(R.id.btn_pip, 0xFFF48FB1);
@@ -213,24 +241,36 @@ public class PlayerActivity extends Activity implements TextureView.SurfaceTextu
         if (playBtn != null) playBtn.setColorFilter(prefs.accent());
         if (sideMuteBtn != null) sideMuteBtn.setColorFilter(0xFFFFCC80);
         if (speedBtn != null) speedBtn.setTextColor(prefs.accent());
-        if (resizeBtn != null) resizeBtn.setTextColor(0xFF81C784);
-        if (lockBtn != null) lockBtn.setTextColor(0xFFFFB74D);
-        if (bgBtn != null) bgBtn.setTextColor(0xFF64B5F6);
-        if (repeatBtn != null) repeatBtn.setTextColor(0xFFBA68C8);
-        if (shuffleBtn != null) shuffleBtn.setTextColor(0xFFF48FB1);
-        hdrBtn = findViewById(R.id.btn_hdr);
-        hdrBtn.setOnClickListener(v -> {
-            hdrMode = (hdrMode + 1) % 3;
-            applyHdr();
-            toast(hdrMode == 0 ? "HDR Enhance: Off"
-                    : hdrMode == 1 ? "HDR Enhance: On — brighter colors & contrast"
-                    : "HDR Enhance: Vivid");
+        if (resizeBtn != null) resizeBtn.setColorFilter(0xFF81C784);
+        if (lockBtn != null) lockBtn.setColorFilter(0xFFFFB74D);
+        if (bgBtn != null) bgBtn.setColorFilter(0xFF64B5F6);
+        if (repeatBtn != null) repeatBtn.setColorFilter(0x99FFFFFF);
+        if (shuffleBtn != null) shuffleBtn.setColorFilter(0x99FFFFFF);
+        findViewById(R.id.btn_hw).setOnClickListener(v -> {
+            toast("HW — hardware decoding (device codecs)");
             showControls();
         });
+        findViewById(R.id.btn_subtitle).setOnClickListener(v -> pickSubtitle());
+        try {
+            noisyReceiver = new android.content.BroadcastReceiver() {
+                @Override public void onReceive(android.content.Context c, Intent i) {
+                    if (prefs.pauseDisconnect() && mp != null && prepared) {
+                        try {
+                            if (mp.isPlaying()) {
+                                mp.pause();
+                                playBtn.setImageResource(R.drawable.ic_play);
+                            }
+                        } catch (Exception ignored) {}
+                    }
+                }
+            };
+            registerReceiver(noisyReceiver,
+                    new android.content.IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY));
+        } catch (Exception ignored) {}
 
         seekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override public void onProgressChanged(SeekBar sb, int p, boolean fromUser) {
-                if (fromUser) timeCur.setText(Prefs.fmtDuration(p));
+                if (fromUser) timeLabel.setText(Prefs.fmtDuration(p) + " / " + Prefs.fmtDuration(sb.getMax()));
             }
             @Override public void onStartTrackingTouch(SeekBar sb) { userSeeking = true; }
             @Override public void onStopTrackingTouch(SeekBar sb) {
@@ -261,11 +301,9 @@ public class PlayerActivity extends Activity implements TextureView.SurfaceTextu
                 videoH = p.getVideoHeight();
                 applySurfaceSize();
                 applyOrientation();
-                qualityLabel.setText(item.quality().isEmpty()
-                        ? (videoW > 0 ? videoW + "×" + videoH : "") : item.quality());
                 int dur = p.getDuration();
                 seekBar.setMax(Math.max(dur, 0));
-                timeTotal.setText(Prefs.fmtDuration(dur));
+                timeLabel.setText(Prefs.fmtDuration(0) + " / " + Prefs.fmtDuration(dur));
                 p.setPlaybackParams(p.getPlaybackParams().setSpeed(speed));
                 long resume = prefs.resumeOn() ? prefs.resumePos(item.uriStr) : 0;
                 if (resume > 3000 && resume < dur - 3000) {
@@ -273,7 +311,19 @@ public class PlayerActivity extends Activity implements TextureView.SurfaceTextu
                     toast("Resumed at " + Prefs.fmtDuration(resume));
                 }
                 p.start();
-                prefs.addHistory(item.uriStr, item.name);
+                if (prefs.audioFocus()) requestAudioFocus();
+                try {
+                    if (enhancer != null) { enhancer.release(); enhancer = null; }
+                    enhancer = new android.media.audiofx.LoudnessEnhancer(p.getAudioSessionId());
+                    enhancer.setTargetGain(prefs.volBoost() ? 600 : 0);
+                    enhancer.setEnabled(prefs.volBoost());
+                } catch (Exception ignored) {}
+                if (prefs.rememberBrightness() && prefs.savedBrightness() >= 0f) {
+                    WindowManager.LayoutParams wl = getWindow().getAttributes();
+                    wl.screenBrightness = prefs.savedBrightness();
+                    getWindow().setAttributes(wl);
+                }
+                if (prefs.watchHistory()) prefs.addHistory(item.uriStr, item.name);
                 playBtn.setImageResource(R.drawable.ic_pause);
                 ui.removeCallbacks(progressTick);
                 ui.post(progressTick);
@@ -293,7 +343,7 @@ public class PlayerActivity extends Activity implements TextureView.SurfaceTextu
                 } else if (repeatMode == 1 && !PlayQueue.items.isEmpty()) {
                     PlayQueue.index = 0;
                     item = PlayQueue.current();
-                    titleTv.setText(item.name);
+                    updateTitle();
                     startPlayback();
                 } else {
                     BgPlayService.stop(this);
@@ -334,6 +384,41 @@ public class PlayerActivity extends Activity implements TextureView.SurfaceTextu
         }
     }
 
+    private void updateTitle() {
+        if (item == null) return;
+        titleTv.setText(item.name);
+        if (folderTv != null) {
+            String f = item.folderName != null ? item.folderName : "";
+            String q = item.quality();
+            folderTv.setText(q.isEmpty() ? f : (f.isEmpty() ? q : f + "  •  " + q));
+        }
+    }
+
+    private String fmtSpeedLabel() {
+        return speed == (int) speed ? ((int) speed) + ".0" : trimFloat(speed);
+    }
+
+    private void requestAudioFocus() {
+        try {
+            if (focusAm == null) focusAm = (AudioManager) getSystemService(AUDIO_SERVICE);
+            if (focusAm == null) return;
+            if (android.os.Build.VERSION.SDK_INT >= 26) {
+                android.media.AudioFocusRequest req =
+                        new android.media.AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
+                                .setAudioAttributes(new android.media.AudioAttributes.Builder()
+                                        .setUsage(android.media.AudioAttributes.USAGE_MEDIA)
+                                        .setContentType(android.media.AudioAttributes.CONTENT_TYPE_MOVIE)
+                                        .build())
+                                .setOnAudioFocusChangeListener(focusListener)
+                                .build();
+                focusAm.requestAudioFocus(req);
+            } else {
+                focusAm.requestAudioFocus(focusListener, AudioManager.STREAM_MUSIC,
+                        AudioManager.AUDIOFOCUS_GAIN);
+            }
+        } catch (Exception ignored) {}
+    }
+
     private void togglePlay() {
         if (mp == null || !prepared) return;
         if (mp.isPlaying()) {
@@ -354,7 +439,7 @@ public class PlayerActivity extends Activity implements TextureView.SurfaceTextu
             do { n = r.nextInt(PlayQueue.items.size()); } while (n == PlayQueue.index);
             PlayQueue.index = n;
             item = PlayQueue.current();
-            titleTv.setText(item.name);
+            updateTitle();
             cues = null;
             subtitleTv.setText("");
             startPlayback();
@@ -364,7 +449,7 @@ public class PlayerActivity extends Activity implements TextureView.SurfaceTextu
         saveResume();
         PlayQueue.index++;
         item = PlayQueue.current();
-        titleTv.setText(item.name);
+        updateTitle();
         cues = null;
         subtitleTv.setText("");
         startPlayback();
@@ -375,7 +460,7 @@ public class PlayerActivity extends Activity implements TextureView.SurfaceTextu
         saveResume();
         PlayQueue.index--;
         item = PlayQueue.current();
-        titleTv.setText(item.name);
+        updateTitle();
         cues = null;
         subtitleTv.setText("");
         startPlayback();
@@ -509,8 +594,6 @@ public class PlayerActivity extends Activity implements TextureView.SurfaceTextu
     private void applyHdr() {
         if (hdrMode == 0) {
             try { surface.setLayerPaint(null); } catch (Exception ignored) {}
-            hdrBtn.setText("HDR");
-            hdrBtn.setTextColor(0xFF7FB3E8);
             return;
         }
         float contrast = hdrMode == 1 ? 1.18f : 1.32f;
@@ -529,8 +612,6 @@ public class PlayerActivity extends Activity implements TextureView.SurfaceTextu
         Paint paint = new Paint();
         paint.setColorFilter(new ColorMatrixColorFilter(cm));
         try { surface.setLayerPaint(paint); } catch (Exception ignored) {}
-        hdrBtn.setText(hdrMode == 1 ? "HDR" : "HDR+");
-        hdrBtn.setTextColor(prefs.accent());
     }
 
     private void applySurfaceSize() {
@@ -670,8 +751,7 @@ public class PlayerActivity extends Activity implements TextureView.SurfaceTextu
 
     private void toggleBg() {
         bgMode = !bgMode;
-        bgBtn.setTextColor(bgMode ? prefs.accent() : 0xFFFFFFFF);
-        if (topBgBtn != null) topBgBtn.setColorFilter(bgMode ? prefs.accent() : 0xFFFFFFFF);
+        bgBtn.setColorFilter(bgMode ? prefs.accent() : 0xFF64B5F6);
         if (bgMode) {
             BgPlayService.start(this, item.name);
             toast("Background play ON — press Back and the audio keeps playing");
@@ -694,7 +774,7 @@ public class PlayerActivity extends Activity implements TextureView.SurfaceTextu
                     saveResume();
                     PlayQueue.index = w;
                     item = PlayQueue.current();
-                    titleTv.setText(item.name);
+                    updateTitle();
                     cues = null;
                     subtitleTv.setText("");
                     startPlayback();
@@ -710,6 +790,7 @@ public class PlayerActivity extends Activity implements TextureView.SurfaceTextu
         menu.getMenu().add(0, 4, 3, "Sleep timer");
         menu.getMenu().add(0, 5, 4, "Share");
         menu.getMenu().add(0, 6, 5, "Load subtitle (.srt)");
+        menu.getMenu().add(0, 7, 6, "HDR Enhance");
         menu.setOnMenuItemClickListener(mi -> {
             switch (mi.getItemId()) {
                 case 1: {
@@ -784,6 +865,14 @@ public class PlayerActivity extends Activity implements TextureView.SurfaceTextu
                     break;
                 }
                 case 6: pickSubtitle(); break;
+                case 7: {
+                    hdrMode = (hdrMode + 1) % 3;
+                    applyHdr();
+                    toast(hdrMode == 0 ? "HDR Enhance: Off"
+                            : hdrMode == 1 ? "HDR Enhance: On — brighter colors & contrast"
+                            : "HDR Enhance: Vivid");
+                    break;
+                }
                 case 5: {
                     android.content.Intent send = new android.content.Intent(android.content.Intent.ACTION_SEND);
                     send.setType("video/*");
@@ -806,7 +895,7 @@ public class PlayerActivity extends Activity implements TextureView.SurfaceTextu
         bottomBar.setVisibility(View.VISIBLE);
         if (sideMuteBtn != null) sideMuteBtn.setVisibility(View.VISIBLE);
         ui.removeCallbacks(hideControls);
-        ui.postDelayed(hideControls, 3500);
+        ui.postDelayed(hideControls, prefs.ctrlTimeout() * 1000L);
     }
 
     private void hideControls() {
@@ -840,7 +929,7 @@ public class PlayerActivity extends Activity implements TextureView.SurfaceTextu
         try {
             int pos = mp.getCurrentPosition();
             seekBar.setProgress(pos);
-            timeCur.setText(Prefs.fmtDuration(pos));
+            timeLabel.setText(Prefs.fmtDuration(pos) + " / " + Prefs.fmtDuration(seekBar.getMax()));
             if (cues != null) {
                 SrtParser.Cue c = SrtParser.at(cues, pos);
                 subtitleTv.setText(c != null ? c.text : "");
@@ -915,12 +1004,14 @@ public class PlayerActivity extends Activity implements TextureView.SurfaceTextu
                     WindowManager.LayoutParams lp = getWindow().getAttributes();
                     lp.screenBrightness = nb;
                     getWindow().setAttributes(lp);
+                    if (prefs.rememberBrightness()) prefs.setSavedBrightness(nb);
                     showGesture("Brightness " + Math.round(nb * 100) + "%");
                 } else if (gestureMode == 3 && am != null) {
                     int max = am.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
                     int nv = Math.max(0, Math.min(max,
                             downVolume + Math.round(-dy / range * max)));
-                    am.setStreamVolume(AudioManager.STREAM_MUSIC, nv, 0);
+                    am.setStreamVolume(AudioManager.STREAM_MUSIC, nv,
+                            prefs.sysVolPanel() ? AudioManager.FLAG_SHOW_UI : 0);
                     showGesture("Volume " + Math.round((float) nv / max * 100) + "%");
                 }
                 return true;
@@ -1017,6 +1108,9 @@ public class PlayerActivity extends Activity implements TextureView.SurfaceTextu
     protected void onDestroy() {
         ui.removeCallbacks(progressTick);
         ui.removeCallbacks(hideControls);
+        try { if (noisyReceiver != null) unregisterReceiver(noisyReceiver); } catch (Exception ignored) {}
+        try { if (enhancer != null) { enhancer.release(); enhancer = null; } } catch (Exception ignored) {}
+        try { if (focusAm != null) focusAm.abandonAudioFocus(focusListener); } catch (Exception ignored) {}
         BgPlayService.stop(this);
         releasePlayer();
         super.onDestroy();

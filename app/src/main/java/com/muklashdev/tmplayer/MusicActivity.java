@@ -34,8 +34,8 @@ public class MusicActivity extends Activity implements MusicPlayer.Listener {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         prefs = new Prefs(this);
-        setTheme(prefs.darkTheme() ? R.style.AppThemeDark : R.style.AppThemeLight);
-        boolean d = prefs.darkTheme();
+        setTheme(prefs.isDark(this) ? R.style.AppThemeDark : R.style.AppThemeLight);
+        boolean d = prefs.isDark(this);
         cText = d ? 0xFFF2F6FC : 0xFF0B1220;
         cDim = d ? 0xFF93A3BC : 0xFF5A6B84;
         cAccent = prefs.accent();

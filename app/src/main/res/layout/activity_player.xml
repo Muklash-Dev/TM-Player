@@ -53,7 +53,7 @@
         android:textSize="16sp"
         android:textStyle="bold" />
 
-    <!-- Top bar -->
+    <!-- Top bar (minimal) -->
     <LinearLayout
         android:id="@+id/top_bar"
         android:layout_width="match_parent"
@@ -71,44 +71,44 @@
             android:background="?android:attr/selectableItemBackgroundBorderless"
             android:src="@drawable/ic_back" />
 
-        <TextView
-            android:id="@+id/player_title"
+        <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginLeft="4dp"
             android:layout_weight="1"
-            android:ellipsize="end"
-            android:maxLines="1"
-            android:textColor="#FFFFFF"
-            android:textSize="15sp" />
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/player_title"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:textColor="#FFFFFF"
+                android:textSize="15sp" />
+
+            <TextView
+                android:id="@+id/player_folder"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:textColor="#B0BEC5"
+                android:textSize="12sp" />
+        </LinearLayout>
 
         <TextView
-            android:id="@+id/btn_hdr"
+            android:id="@+id/btn_hw"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:background="@drawable/badge_bg"
             android:paddingLeft="8dp"
-            android:paddingTop="4dp"
+            android:paddingTop="10dp"
             android:paddingRight="8dp"
-            android:paddingBottom="4dp"
-            android:text="HDR"
-            android:textColor="#7FB3E8"
-            android:textSize="11.5sp"
+            android:paddingBottom="10dp"
+            android:text="HW"
+            android:textColor="#FFCA28"
+            android:textSize="13sp"
             android:textStyle="bold" />
-
-        <ImageButton
-            android:id="@+id/btn_shot"
-            android:layout_width="44dp"
-            android:layout_height="44dp"
-            android:background="?android:attr/selectableItemBackgroundBorderless"
-            android:src="@drawable/ic_camera" />
-
-        <ImageButton
-            android:id="@+id/btn_top_bg"
-            android:layout_width="44dp"
-            android:layout_height="44dp"
-            android:background="?android:attr/selectableItemBackgroundBorderless"
-            android:src="@drawable/ic_headphone" />
 
         <ImageButton
             android:id="@+id/btn_top_queue"
@@ -118,25 +118,18 @@
             android:src="@drawable/ic_queue" />
 
         <ImageButton
+            android:id="@+id/btn_subtitle"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/ic_subtitle" />
+
+        <ImageButton
             android:id="@+id/btn_top_more"
             android:layout_width="44dp"
             android:layout_height="44dp"
             android:background="?android:attr/selectableItemBackgroundBorderless"
             android:src="@drawable/ic_more" />
-
-        <ImageButton
-            android:id="@+id/btn_rotate"
-            android:layout_width="44dp"
-            android:layout_height="44dp"
-            android:background="?android:attr/selectableItemBackgroundBorderless"
-            android:src="@drawable/ic_rotate" />
-
-        <ImageButton
-            android:id="@+id/btn_pip"
-            android:layout_width="44dp"
-            android:layout_height="44dp"
-            android:background="?android:attr/selectableItemBackgroundBorderless"
-            android:src="@drawable/ic_pip" />
     </LinearLayout>
 
     <!-- Center controls -->
@@ -172,7 +165,7 @@
             android:src="@drawable/ic_next" />
     </LinearLayout>
 
-    <!-- Bottom controls -->
+    <!-- Bottom controls (minimal) -->
     <LinearLayout
         android:id="@+id/bottom_bar"
         android:layout_width="match_parent"
@@ -191,95 +184,12 @@
             android:orientation="horizontal">
 
             <TextView
-                android:id="@+id/time_current"
+                android:id="@+id/time_label"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="0:00"
+                android:text="0:00 / 0:00"
                 android:textColor="#FFFFFF"
                 android:textSize="12.5sp" />
-
-            <SeekBar
-                android:id="@+id/seek_bar"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginLeft="8dp"
-                android:layout_marginRight="8dp"
-                android:layout_weight="1" />
-
-            <TextView
-                android:id="@+id/time_total"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="0:00"
-                android:textColor="#FFFFFF"
-                android:textSize="12.5sp" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:gravity="center_vertical"
-            android:orientation="horizontal">
-
-            <TextView
-                android:id="@+id/btn_speed"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:padding="10dp"
-                android:text="1.0x"
-                android:textColor="#FFFFFF"
-                android:textSize="13.5sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:id="@+id/btn_resize"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:padding="10dp"
-                android:text="Fit"
-                android:textColor="#FFFFFF"
-                android:textSize="13.5sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:id="@+id/btn_lock"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:padding="10dp"
-                android:text="Lock"
-                android:textColor="#FFFFFF"
-                android:textSize="13.5sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:id="@+id/btn_bg"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:padding="10dp"
-                android:text="BG play"
-                android:textColor="#FFFFFF"
-                android:textSize="13.5sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:id="@+id/btn_repeat"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:padding="10dp"
-                android:text="Repeat: Off"
-                android:textColor="#FFFFFF"
-                android:textSize="13.5sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:id="@+id/btn_shuffle"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:padding="10dp"
-                android:text="Shuffle"
-                android:textColor="#FFFFFF"
-                android:textSize="13.5sp"
-                android:textStyle="bold" />
 
             <View
                 android:layout_width="0dp"
@@ -287,13 +197,88 @@
                 android:layout_weight="1" />
 
             <TextView
-                android:id="@+id/quality_label"
+                android:id="@+id/btn_speed"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:padding="10dp"
-                android:textColor="#7DEFFC"
-                android:textSize="12.5sp"
+                android:padding="8dp"
+                android:text="1.0"
+                android:textColor="#FFFFFF"
+                android:textSize="14sp"
                 android:textStyle="bold" />
+
+            <ImageButton
+                android:id="@+id/btn_rotate"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:background="?android:attr/selectableItemBackgroundBorderless"
+                android:src="@drawable/ic_rotate" />
+        </LinearLayout>
+
+        <SeekBar
+            android:id="@+id/seek_bar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <ImageButton
+                android:id="@+id/btn_lock"
+                android:layout_width="0dp"
+                android:layout_height="46dp"
+                android:layout_weight="1"
+                android:background="?android:attr/selectableItemBackgroundBorderless"
+                android:src="@drawable/ic_lock" />
+
+            <ImageButton
+                android:id="@+id/btn_shot"
+                android:layout_width="0dp"
+                android:layout_height="46dp"
+                android:layout_weight="1"
+                android:background="?android:attr/selectableItemBackgroundBorderless"
+                android:src="@drawable/ic_camera" />
+
+            <ImageButton
+                android:id="@+id/btn_resize"
+                android:layout_width="0dp"
+                android:layout_height="46dp"
+                android:layout_weight="1"
+                android:background="?android:attr/selectableItemBackgroundBorderless"
+                android:src="@drawable/ic_resize" />
+
+            <ImageButton
+                android:id="@+id/btn_pip"
+                android:layout_width="0dp"
+                android:layout_height="46dp"
+                android:layout_weight="1"
+                android:background="?android:attr/selectableItemBackgroundBorderless"
+                android:src="@drawable/ic_pip" />
+
+            <ImageButton
+                android:id="@+id/btn_bg"
+                android:layout_width="0dp"
+                android:layout_height="46dp"
+                android:layout_weight="1"
+                android:background="?android:attr/selectableItemBackgroundBorderless"
+                android:src="@drawable/ic_headphone" />
+
+            <ImageButton
+                android:id="@+id/btn_repeat"
+                android:layout_width="0dp"
+                android:layout_height="46dp"
+                android:layout_weight="1"
+                android:background="?android:attr/selectableItemBackgroundBorderless"
+                android:src="@drawable/ic_repeat" />
+
+            <ImageButton
+                android:id="@+id/btn_shuffle"
+                android:layout_width="0dp"
+                android:layout_height="46dp"
+                android:layout_weight="1"
+                android:background="?android:attr/selectableItemBackgroundBorderless"
+                android:src="@drawable/ic_shuffle" />
         </LinearLayout>
     </LinearLayout>
 

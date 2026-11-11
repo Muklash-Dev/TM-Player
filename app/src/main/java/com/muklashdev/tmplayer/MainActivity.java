@@ -114,7 +114,7 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         prefs = new Prefs(this);
-        setTheme(prefs.darkTheme() ? R.style.AppThemeDark : R.style.AppThemeLight);
+        setTheme(prefs.isDark(this) ? R.style.AppThemeDark : R.style.AppThemeLight);
         setContentView(R.layout.activity_main);
         computeColors();
 
@@ -284,13 +284,14 @@ public class MainActivity extends Activity {
     // ------------------------------------------------------------ theming
 
     private void computeColors() {
-        boolean d = prefs.darkTheme();
-        cBg = d ? 0xFF070B14 : 0xFFF4F7FB;
-        cCard = d ? 0xFF101828 : 0xFFFFFFFF;
-        cCard2 = d ? 0xFF182236 : 0xFFE8EEF6;
+        boolean d = prefs.isDark(this);
+        boolean hc = d && prefs.highContrast();
+        cBg = hc ? 0xFF000000 : d ? 0xFF070B14 : 0xFFF4F7FB;
+        cCard = hc ? 0xFF0B0B0B : d ? 0xFF101828 : 0xFFFFFFFF;
+        cCard2 = hc ? 0xFF161616 : d ? 0xFF182236 : 0xFFE8EEF6;
         cText = d ? 0xFFF2F6FC : 0xFF0B1220;
         cDim = d ? 0xFF9DADC6 : 0xFF42536B;
-        cAccent = prefs.accent();
+        cAccent = prefs.accent(this);
     }
 
     private void styleChrome() {
@@ -409,6 +410,161 @@ public class MainActivity extends Activity {
         }
     }
 
+    // ------------------------------------------------------------ Quick Settings (home shortcut sheet)
+
+    private static int sortFieldOf(int sort) { // 0 Title, 1 Duration, 2 Date, 3 Size
+        switch (sort) {
+            case 2: case 3: return 0;
+            case 6: case 7: return 1;
+            case 4: case 5: return 3;
+            default: return 2;
+        }
+    }
+
+    private static boolean sortAscOf(int sort) {
+        return sort == 1 || sort == 2 || sort == 5 || sort == 7;
+    }
+
+    private static int sortCombined(int field, boolean asc) {
+        switch (field) {
+            case 0: return asc ? 2 : 3;  // Title
+            case 1: return asc ? 7 : 6;  // Duration
+            case 3: return asc ? 5 : 4;  // Size
+            default: return asc ? 1 : 0; // Date
+        }
+    }
+
+    private void openQuickSettings() {
+        final int[] qView = {videoSub == 3 ? 0 : videoSub == 1 ? 1 : 2}; // 0 Tree, 1 Folders, 2 Videos
+        final boolean[] qList = {prefs.listMode()};
+        final int[] qField = {sortFieldOf(prefs.sort())};
+        final boolean[] qAsc = {sortAscOf(prefs.sort())};
+        final boolean[] qF = {prefs.fldDuration(), prefs.fldFolderDuration(), prefs.fldExtension(),
+                prefs.fldPath(), prefs.fldProgress(), prefs.fldResolution(), prefs.fldSize(),
+                prefs.fldThumbnail()};
+        final String[] fieldNames = {"Duration", "Folder duration", "Extension", "Path",
+                "Played progress", "Resolution", "Size", "Thumbnail"};
+        final String[][] dirLabels = {{"A–Z", "Z–A"}, {"Shortest first", "Longest first"},
+                {"Oldest first", "Newest first"}, {"Smallest first", "Largest first"}};
+        final AlertDialog[] dlg = new AlertDialog[1];
+
+        LinearLayout col = new LinearLayout(this);
+        col.setOrientation(LinearLayout.VERTICAL);
+        col.setPadding(dp(18), dp(16), dp(18), dp(8));
+        ScrollView sv = new ScrollView(this);
+        sv.addView(col);
+
+        final Runnable[] render = new Runnable[1];
+        render[0] = () -> {
+            col.removeAllViews();
+            col.addView(bigText("Quick Settings"));
+            col.addView(sectionLabel("Media view mode"));
+            col.addView(segmented(new String[]{"Tree", "Folders", "Videos"}, qView[0],
+                    i -> { qView[0] = i; render[0].run(); }, false));
+            col.addView(sectionLabel("Media Layout"));
+            col.addView(segmented(new String[]{"List", "Grid"}, qList[0] ? 0 : 1,
+                    i -> { qList[0] = i == 0; render[0].run(); }, false));
+            col.addView(sectionLabel("Sort"));
+            String[] glyphs = {"T", "◷", "▦", "⇅"};
+            String[] names = {"Title", "Duration", "Date", "Size"};
+            LinearLayout circles = new LinearLayout(this);
+            circles.setOrientation(LinearLayout.HORIZONTAL);
+            for (int i = 0; i < 4; i++) {
+                final int fi = i;
+                LinearLayout cellL = new LinearLayout(this);
+                cellL.setOrientation(LinearLayout.VERTICAL);
+                cellL.setGravity(Gravity.CENTER_HORIZONTAL);
+                TextView circ = new TextView(this);
+                circ.setText(glyphs[i]);
+                circ.setTextSize(i == 0 ? 19f : 17f);
+                circ.setTypeface(null, android.graphics.Typeface.BOLD);
+                circ.setGravity(Gravity.CENTER);
+                GradientDrawable gd = new GradientDrawable();
+                gd.setShape(GradientDrawable.OVAL);
+                boolean sel = qField[0] == i;
+                gd.setColor(sel ? cAccent : cCard2);
+                circ.setBackground(gd);
+                circ.setTextColor(sel ? 0xFFFFFFFF : cText);
+                cellL.addView(circ, new LinearLayout.LayoutParams(dp(50), dp(50)));
+                TextView lab = new TextView(this);
+                lab.setText(names[i]);
+                lab.setTextSize(11.5f);
+                lab.setTextColor(sel ? cAccent : cDim);
+                lab.setPadding(0, dp(5), 0, 0);
+                cellL.addView(lab);
+                cellL.setOnClickListener(v -> { qField[0] = fi; render[0].run(); });
+                circles.addView(cellL, new LinearLayout.LayoutParams(
+                        0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+            }
+            col.addView(circles);
+            col.addView(segmented(dirLabels[qField[0]], qAsc[0] ? 0 : 1,
+                    i -> { qAsc[0] = i == 0; render[0].run(); }, false));
+            col.addView(sectionLabel("Fields"));
+            for (int r = 0; r < 4; r++) {
+                LinearLayout rowL = new LinearLayout(this);
+                rowL.setOrientation(LinearLayout.HORIZONTAL);
+                rowL.setPadding(0, dp(4), 0, dp(4));
+                for (int c = 0; c < 2; c++) {
+                    final int idx = r * 2 + c;
+                    boolean on = qF[idx];
+                    TextView chip = new TextView(this);
+                    chip.setText((on ? "✓ " : "○ ") + fieldNames[idx]);
+                    chip.setTextSize(13.5f);
+                    chip.setTextColor(on ? cText : cDim);
+                    chip.setPadding(dp(13), dp(9), dp(13), dp(9));
+                    GradientDrawable cg = new GradientDrawable();
+                    cg.setCornerRadius(dp(20));
+                    if (on) {
+                        cg.setColor((cAccent & 0x00FFFFFF) | 0x33000000);
+                        cg.setStroke(dp(1), cAccent);
+                    } else {
+                        cg.setColor(cCard2);
+                    }
+                    chip.setBackground(cg);
+                    chip.setOnClickListener(v -> { qF[idx] = !qF[idx]; render[0].run(); });
+                    LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(
+                            0, ViewGroup.LayoutParams.WRAP_CONTENT, 1);
+                    if (c == 0) clp.rightMargin = dp(8);
+                    rowL.addView(chip, clp);
+                }
+                col.addView(rowL);
+            }
+            col.addView(row(0, "Rescan library", "Look for new videos and music again", "›",
+                    v -> {
+                        if (dlg[0] != null) dlg[0].dismiss();
+                        cacheAll = null;
+                        cacheAudio = null;
+                        loadLibrary();
+                    }));
+        };
+        render[0].run();
+
+        dlg[0] = new AlertDialog.Builder(this)
+                .setView(sv)
+                .setNegativeButton("Cancel", null)
+                .setPositiveButton("Done", (d, w) -> {
+                    prefs.setListMode(qList[0]);
+                    videoSub = qView[0] == 0 ? 3 : qView[0] == 1 ? 1 : 0;
+                    prefs.setSort(sortCombined(qField[0], qAsc[0]));
+                    MediaLib.sort(allVideos, prefs.sort());
+                    prefs.setFldDuration(qF[0]);
+                    prefs.setFldFolderDuration(qF[1]);
+                    prefs.setFldExtension(qF[2]);
+                    prefs.setFldPath(qF[3]);
+                    prefs.setFldProgress(qF[4]);
+                    prefs.setFldResolution(qF[5]);
+                    prefs.setFldSize(qF[6]);
+                    prefs.setFldThumbnail(qF[7]);
+                    baseList = lib();
+                    baseTitle = null;
+                    currentPlaylist = null;
+                    showVideoSection();
+                    toast("Quick Settings applied");
+                })
+                .create();
+        dlg[0].show();
+    }
+
     private void showSortMenu(View anchor) {
         PopupMenu menu = new PopupMenu(this, anchor);
         for (int i = 0; i < Prefs.SORT_NAMES.length; i++) {
@@ -519,6 +675,7 @@ public class MainActivity extends Activity {
         switch (videoSub) {
             case 1: showFolders(); break;
             case 2: showPlaylists(); break;
+            case 3: showTree(); break;
             default:
                 baseList = lib();
                 baseTitle = null;
@@ -544,7 +701,7 @@ public class MainActivity extends Activity {
         sortBtn.setTextColor(cText);
         sortBtn.setTextSize(20f);
         sortBtn.setPadding(dp(12), dp(8), dp(6), dp(8));
-        sortBtn.setOnClickListener(v -> showSortMenu(v));
+        sortBtn.setOnClickListener(v -> openQuickSettings());
         bar.addView(sortBtn);
         TextView viewBtn = new TextView(this);
         viewBtn.setText(prefs.listMode() ? "⊞" : "☰");
@@ -730,12 +887,19 @@ public class MainActivity extends Activity {
         List<VideoItem> items;
         final boolean listMode;
         final boolean groupByMonth;
+        final String lastUri;
+        final long newCutoffSec;
         List<Object> flat = new ArrayList<>(); // String month headers + VideoItems (list mode)
 
         VideoAdapter(List<VideoItem> items, boolean listMode, boolean groupByMonth) {
             this.items = items;
             this.listMode = listMode;
             this.groupByMonth = groupByMonth;
+            java.util.List<String[]> h = prefs.history();
+            this.lastUri = prefs.markLastPlayed() && !h.isEmpty() ? h.get(0)[0] : null;
+            this.newCutoffSec = prefs.newDays() > 0
+                    ? System.currentTimeMillis() / 1000 - prefs.newDays() * 86400L
+                    : Long.MAX_VALUE;
             rebuildFlat();
         }
 
@@ -813,9 +977,19 @@ public class MainActivity extends Activity {
                 qual.setText(v.quality());
                 qual.setVisibility(v.quality().isEmpty() ? View.GONE : View.VISIBLE);
                 dur.setText(Prefs.fmtDuration(v.duration));
-                String q = v.quality();
-                meta.setText((q.isEmpty() ? "" : q + " | ") + Prefs.fmtSize(v.size));
+                dur.setVisibility(prefs.fldDuration() ? View.VISIBLE : View.GONE);
+                String metaTxt = metaFor(v, true);
+                if (lastUri != null && lastUri.equals(v.uriStr)) {
+                    metaTxt = "▶ Last played  •  " + metaTxt;
+                }
+                meta.setText(metaTxt);
                 meta.setTextColor(cDim);
+                bindProgress(row.findViewById(R.id.row_progress_bg),
+                        row.findViewById(R.id.row_progress), v);
+                TextView newB = row.findViewById(R.id.row_new);
+                boolean isNew = v.dateModified > newCutoffSec;
+                newB.setVisibility(isNew ? View.VISIBLE : View.GONE);
+                if (isNew) newB.setText("NEW");
                 chip.setText(v.fromVault ? "Private Vault"
                         : (v.folderName != null ? v.folderName : "Video"));
                 more.setTextColor(cDim);
@@ -835,10 +1009,23 @@ public class MainActivity extends Activity {
             name.setTextColor(cText);
             name.setTextSize(12.5f * scale);
             name.setVisibility(prefs.showName() ? View.VISIBLE : View.GONE);
-            meta.setText(Prefs.fmtSize(v.size));
+            meta.setText(metaFor(v, false));
             meta.setTextColor(cDim);
             meta.setTextSize(11f * scale);
             dur.setText(Prefs.fmtDuration(v.duration));
+            dur.setVisibility(prefs.fldDuration() ? View.VISIBLE : View.GONE);
+            bindProgress(cell.findViewById(R.id.cell_progress_bg),
+                    cell.findViewById(R.id.cell_progress), v);
+            TextView newC = cell.findViewById(R.id.cell_new);
+            if (v.dateModified > newCutoffSec) {
+                newC.setText("NEW");
+                newC.setVisibility(View.VISIBLE);
+            } else if (lastUri != null && lastUri.equals(v.uriStr)) {
+                newC.setText("▶ LAST");
+                newC.setVisibility(View.VISIBLE);
+            } else {
+                newC.setVisibility(View.GONE);
+            }
             qual.setText(v.quality());
             qual.setVisibility(v.quality().isEmpty() ? View.GONE : View.VISIBLE);
             loadThumbInto(thumb, v);
@@ -846,10 +1033,62 @@ public class MainActivity extends Activity {
         }
     }
 
+    /** Meta line under a video, composed from the Quick Settings field choices. */
+    private String metaFor(VideoItem v, boolean listMode) {
+        List<String> parts = new ArrayList<>();
+        if (prefs.fldResolution() && v.width > 0 && v.height > 0) {
+            parts.add(v.width + "×" + v.height);
+        } else if (!v.quality().isEmpty()) {
+            parts.add(v.quality());
+        }
+        if (prefs.fldSize()) parts.add(Prefs.fmtSize(v.size));
+        if (prefs.fldExtension() && v.name != null) {
+            int dot = v.name.lastIndexOf('.');
+            if (dot > 0 && dot < v.name.length() - 1) {
+                parts.add(v.name.substring(dot + 1).toUpperCase(java.util.Locale.US));
+            }
+        }
+        String s = String.join(" | ", parts);
+        if (listMode && prefs.fldPath()) {
+            String p = v.folderPath != null ? v.folderPath
+                    : (v.folderName != null ? v.folderName : "");
+            if (!p.isEmpty()) s = s.isEmpty() ? p : s + "  •  " + p;
+        }
+        return s;
+    }
+
+    /** Watched-progress bar under a thumbnail (from the saved resume position). */
+    private void bindProgress(View bg, View fill, VideoItem v) {
+        if (bg == null || fill == null) return;
+        long resume = prefs.resumePos(v.uriStr);
+        if (!prefs.fldProgress() || resume <= 0 || v.duration <= 0) {
+            bg.setVisibility(View.GONE);
+            return;
+        }
+        bg.setVisibility(View.VISIBLE);
+        fill.setBackgroundColor(prefs.accent());
+        double frac = Math.min(1.0, (double) resume / (double) v.duration);
+        bg.post(() -> {
+            ViewGroup.LayoutParams lp = fill.getLayoutParams();
+            lp.width = Math.max(dp(3), (int) (bg.getWidth() * frac));
+            fill.setLayoutParams(lp);
+        });
+    }
+
     private void loadThumbInto(ImageView iv, VideoItem v) {
         iv.setImageBitmap(null);
         iv.setBackgroundColor(0xFF1A2438);
         iv.setTag(v.uriStr);
+        if (!prefs.fldThumbnail()) {
+            iv.setImageResource(R.drawable.ic_nav_videos);
+            iv.setColorFilter(cDim);
+            iv.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+            iv.setPadding(dp(18), dp(18), dp(18), dp(18));
+            return;
+        }
+        iv.clearColorFilter();
+        iv.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        iv.setPadding(0, 0, 0, 0);
         exec.execute(() -> {
             Bitmap b = MediaLib.loadThumb(MainActivity.this, v, 320, 200);
             if (b == null) return;
@@ -905,7 +1144,7 @@ public class MainActivity extends Activity {
             for (VideoItem v : items) total += v.size;
             String folderName = items.get(0).folderName != null ? items.get(0).folderName : "Folder";
             col.addView(row(R.drawable.ic_nav_folders, folderName,
-                    items.size() + " videos  •  " + Prefs.fmtSize(total), "›",
+                    folderSub(items), "›",
                     v -> {
                         baseList = items;
                         baseTitle = folderName;
@@ -915,6 +1154,76 @@ public class MainActivity extends Activity {
         }
         sv.addView(col);
         content.addView(sv);
+    }
+
+    private String folderSub(List<VideoItem> items) {
+        long total = 0, totalDur = 0;
+        for (VideoItem v : items) { total += v.size; totalDur += v.duration; }
+        String s = items.size() + " videos  •  " + Prefs.fmtSize(total);
+        if (prefs.fldFolderDuration() && totalDur > 0) {
+            s += "  •  " + Prefs.fmtDuration(totalDur);
+        }
+        return s;
+    }
+
+    /** Tree view: folders grouped under their storage root (internal / SD / USB). */
+    private void showTree() {
+        content.removeAllViews();
+        ScrollView sv = new ScrollView(this);
+        LinearLayout col = new LinearLayout(this);
+        col.setOrientation(LinearLayout.VERTICAL);
+        col.addView(videoHeader());
+        col.addView(row(0, "Browse any folder…", "SD card, USB pendrive — any folder", "›",
+                v -> {
+                    Intent pick = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
+                    startActivityForResult(pick, REQ_TREE);
+                }));
+        Map<String, List<VideoItem>> byFolder = new LinkedHashMap<>();
+        for (VideoItem v : lib()) {
+            String key = v.folderPath != null ? v.folderPath
+                    : (v.folderName != null ? v.folderName : "Unknown");
+            byFolder.computeIfAbsent(key, k -> new ArrayList<>()).add(v);
+        }
+        List<String> roots = new ArrayList<>();
+        try { roots = storageRoots(); } catch (Exception ignored) {}
+        java.util.Set<String> placed = new java.util.HashSet<>();
+        for (String root : roots) {
+            List<Map.Entry<String, List<VideoItem>>> under = new ArrayList<>();
+            for (Map.Entry<String, List<VideoItem>> e : byFolder.entrySet()) {
+                if (e.getKey().startsWith(root)) under.add(e);
+            }
+            if (under.isEmpty()) continue;
+            col.addView(sectionLabel(root));
+            for (Map.Entry<String, List<VideoItem>> e : under) {
+                placed.add(e.getKey());
+                addFolderRow(col, e.getValue());
+            }
+        }
+        boolean anyOther = false;
+        for (Map.Entry<String, List<VideoItem>> e : byFolder.entrySet()) {
+            if (placed.contains(e.getKey())) continue;
+            if (!anyOther) {
+                col.addView(sectionLabel("Other locations"));
+                anyOther = true;
+            }
+            addFolderRow(col, e.getValue());
+        }
+        if (byFolder.isEmpty()) {
+            col.addView(dimText("No folders yet — allow media access and rescan."));
+        }
+        sv.addView(col);
+        content.addView(sv);
+    }
+
+    private void addFolderRow(LinearLayout col, List<VideoItem> items) {
+        String folderName = items.get(0).folderName != null ? items.get(0).folderName : "Folder";
+        col.addView(row(R.drawable.ic_nav_folders, folderName, folderSub(items), "›",
+                v -> {
+                    baseList = items;
+                    baseTitle = folderName;
+                    currentPlaylist = null;
+                    showVideoGrid(true);
+                }));
     }
 
     private void showPlaylists() {
@@ -1936,6 +2245,7 @@ public class MainActivity extends Activity {
             cards.add(themeCard(t.name, top, bottom, sel, false, v -> {
                 prefs.setAccentColor(t.accent);
                 prefs.setDarkTheme(t.dark);
+                prefs.setThemeMode(t.dark ? 2 : 1);
                 recreate();
             }));
         }
@@ -2619,16 +2929,22 @@ public class MainActivity extends Activity {
         if (settingsSection == 0) {
             col.addView(backRow("Me", v -> { mePage = "home"; showMe(); }));
             col.addView(bigText("Settings"));
-            col.addView(row(R.drawable.ic_nav_settings, "Appearance", "Accent, theme, text size", "›",
+            col.addView(row(R.drawable.ic_nav_settings, "Appearance", "Adjust the app to your liking", "›",
                     v -> { settingsSection = 1; showMe(); }));
-            col.addView(row(R.drawable.ic_play, "Playback", "Default speed, screen mode", "›",
+            col.addView(row(R.drawable.ic_nav_folders, "Media library", "Scan and manage media library", "›",
                     v -> { settingsSection = 2; showMe(); }));
-            col.addView(row(R.drawable.ic_nav_folders, "Library", "Grid, storage access, rescan", "›",
+            col.addView(row(R.drawable.ic_play, "Player", "Player appearance, playback controls", "›",
                     v -> { settingsSection = 3; showMe(); }));
-            col.addView(row(R.drawable.ic_nav_vault, "Privacy", "Vault fingerprint, PIN, history", "›",
+            col.addView(row(0, "Gestures", "Configure player touch gestures", "›",
                     v -> { settingsSection = 4; showMe(); }));
-            col.addView(row(R.drawable.ic_person, "About", "Developer, Telegram, GitHub", "›",
+            col.addView(row(R.drawable.ic_headphone, "Audio", "Audio playback options", "›",
                     v -> { settingsSection = 5; showMe(); }));
+            col.addView(row(R.drawable.ic_subtitle, "Subtitle", "Subtitle appearance, playback options", "›",
+                    v -> { settingsSection = 6; showMe(); }));
+            col.addView(row(R.drawable.ic_person, "General", "User data options", "›",
+                    v -> { settingsSection = 7; showMe(); }));
+            col.addView(row(0, "About", "Version, support, credits", "›",
+                    v -> { settingsSection = 8; showMe(); }));
             return;
         }
         col.addView(backRow("Settings", v -> { settingsSection = 0; showMe(); }));
@@ -2636,25 +2952,101 @@ public class MainActivity extends Activity {
             case 1: {
                 col.addView(bigText("Appearance"));
                 col.addView(accentRow());
-                col.addView(dimText("Theme"));
-                col.addView(chips(new String[]{"Dark", "Light"}, prefs.darkTheme() ? 0 : 1,
-                        i -> { prefs.setDarkTheme(i == 0); recreate(); }));
+                col.addView(dimText("Dark theme"));
+                col.addView(chips(new String[]{"System default", "Light", "Dark"}, prefs.themeMode(),
+                        i -> { prefs.setThemeMode(i); recreate(); }));
+                col.addView(toggleRow("High contrast dark theme",
+                        "Use pure black background for dark theme",
+                        prefs.highContrast(),
+                        v -> { prefs.setHighContrast(!prefs.highContrast()); recreate(); }));
+                if (Build.VERSION.SDK_INT >= 31) {
+                    col.addView(toggleRow("Dynamic color theme",
+                            "Apply colors from system wallpaper to the application theme",
+                            prefs.dynamicColor(),
+                            v -> { prefs.setDynamicColor(!prefs.dynamicColor()); recreate(); }));
+                }
                 col.addView(dimText("Text size"));
                 col.addView(chips(new String[]{"Small", "Normal", "Large"}, prefs.textSize(),
                         i -> { prefs.setTextSize(i); recreate(); }));
                 break;
             }
             case 2: {
-                col.addView(bigText("Video"));
+                col.addView(bigText("Media library"));
+                col.addView(toggleRow("Mark last played media",
+                        "Mark last played media in home and in each folder",
+                        prefs.markLastPlayed(),
+                        v -> { prefs.setMarkLastPlayed(!prefs.markLastPlayed()); showMe(); }));
+                final int[] dayVals = {0, 1, 3, 7, 14, 30};
+                col.addView(row(0, "Mark newly added media as new",
+                        "Show a NEW badge on recently added videos",
+                        prefs.newDays() == 0 ? "Off ›" : prefs.newDays() + " days ›",
+                        v -> choiceDialog("Mark as new for",
+                                new String[]{"Off", "1 day", "3 days", "7 days", "14 days", "30 days"},
+                                java.util.Arrays.asList(0, 1, 3, 7, 14, 30).indexOf(prefs.newDays()),
+                                i -> { prefs.setNewDays(dayVals[i]); showMe(); })));
+                col.addView(sectionLabel("Scan"));
+                col.addView(row(0, "Manage folders",
+                        "Select folders to be excluded in the media library",
+                        prefs.hiddenFolders().size() + " hidden ›",
+                        v -> showHiddenFoldersDialog()));
+                col.addView(row(0, "All files access", "Needed on some phones for USB drives", "›",
+                        v -> {
+                            if (Build.VERSION.SDK_INT >= 30) {
+                                try {
+                                    startActivity(new Intent(
+                                            Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
+                                            Uri.parse("package:" + getPackageName())));
+                                } catch (Exception e) {
+                                    toast("Not available on this phone");
+                                }
+                            } else {
+                                toast("Already available on this Android version");
+                            }
+                        }));
+                col.addView(sectionLabel("History"));
+                col.addView(toggleRow("Watch history",
+                        "Keep a record of videos you watch",
+                        prefs.watchHistory(),
+                        v -> { prefs.setWatchHistory(!prefs.watchHistory()); showMe(); }));
+                col.addView(sectionLabel("Thumbnail"));
+                col.addView(row(0, "Thumbnail generation", "Frame at position",
+                        new String[]{"First frame", "10%", "25%", "Middle"}[prefs.thumbPos()] + " ›",
+                        v -> choiceDialog("Thumbnail generation",
+                                new String[]{"First frame", "10% into the video",
+                                        "25% into the video", "Middle"},
+                                prefs.thumbPos(),
+                                i -> { prefs.setThumbPos(i); showMe(); })));
+                col.addView(dimText("Grid columns"));
+                col.addView(chips(new String[]{"2", "3"}, prefs.gridCols() == 2 ? 0 : 1,
+                        i -> prefs.setGridCols(i == 0 ? 2 : 3)));
+                col.addView(button("Rescan library", v -> rescan()));
+                break;
+            }
+            case 3: {
+                col.addView(bigText("Player"));
+                col.addView(sectionLabel("Interface"));
+                final int[] timeoutVals = {2, 3, 4, 5, 6, 8, 10};
+                col.addView(row(0, "Controller timeout", "Hide player controls after",
+                        prefs.ctrlTimeout() + " seconds ›",
+                        v -> choiceDialog("Controller timeout",
+                                new String[]{"2 seconds", "3 seconds", "4 seconds", "5 seconds",
+                                        "6 seconds", "8 seconds", "10 seconds"},
+                                java.util.Arrays.asList(2, 3, 4, 5, 6, 8, 10)
+                                        .indexOf(prefs.ctrlTimeout()),
+                                i -> { prefs.setCtrlTimeout(timeoutVals[i]); showMe(); })));
+                col.addView(toggleRow("Display battery level, time",
+                        "Keep battery and clock visible when the controls are hidden",
+                        prefs.showStatus(),
+                        v -> { prefs.setShowStatus(!prefs.showStatus()); showMe(); }));
                 col.addView(sectionLabel("Display"));
                 col.addView(toggleRow("Show video name",
                         "Display video headlines on the homepage",
                         prefs.showName(),
                         v -> { prefs.setShowName(!prefs.showName()); showMe(); }));
-                col.addView(row(0, "Video screen orientation",
+                col.addView(row(0, "Player screen orientation",
                         "Default orientation for the player",
                         new String[]{"Auto", "Landscape", "Portrait"}[prefs.orientation()] + " ›",
-                        v -> choiceDialog("Video screen orientation",
+                        v -> choiceDialog("Player screen orientation",
                                 new String[]{"Auto", "Landscape", "Portrait"},
                                 prefs.orientation(),
                                 i -> { prefs.setOrientation(i); showMe(); })));
@@ -2672,10 +3064,6 @@ public class MainActivity extends Activity {
                                 new String[]{"Fit", "Fill", "Stretch"},
                                 prefs.defaultResize(),
                                 i -> { prefs.setDefaultResize(i); showMe(); })));
-                col.addView(toggleRow("Display battery level, time",
-                        "Keep battery and clock visible when the controls are hidden",
-                        prefs.showStatus(),
-                        v -> { prefs.setShowStatus(!prefs.showStatus()); showMe(); }));
                 col.addView(sectionLabel("Playback"));
                 String[] speedLabels = new String[Prefs.SPEEDS.length];
                 int sel = 3;
@@ -2685,25 +3073,34 @@ public class MainActivity extends Activity {
                     if (Math.abs(Prefs.SPEEDS[i] - prefs.defaultSpeed()) < 0.01f) sel = i;
                 }
                 final int selF = sel;
-                col.addView(row(0, "Default speed", "Speed new videos start with",
+                col.addView(row(0, "Default playback speed", "Speed new videos start with",
                         speedLabels[selF] + " ›",
-                        v -> choiceDialog("Default speed", speedLabels, selF,
+                        v -> choiceDialog("Default playback speed", speedLabels, selF,
                                 i -> { prefs.setDefaultSpeed(Prefs.SPEEDS[i]); showMe(); })));
-                col.addView(toggleRow("Resume", "Resume from the point where you stopped",
+                col.addView(toggleRow("Resume",
+                        "Resume played videos from the point where you stopped",
                         prefs.resumeOn(),
                         v -> { prefs.setResumeOn(!prefs.resumeOn()); showMe(); }));
+                col.addView(toggleRow("Autoplay",
+                        "Automatically play the next video in the current folder",
+                        prefs.continuous(),
+                        v -> { prefs.setContinuous(!prefs.continuous()); showMe(); }));
+                col.addView(toggleRow("Picture in Picture Mode",
+                        "Automatically switch to miniature player when tapping Home Button",
+                        prefs.autoPip(),
+                        v -> { prefs.setAutoPip(!prefs.autoPip()); showMe(); }));
+                col.addView(toggleRow("Remember brightness level",
+                        "Remember brightness level between playback sessions",
+                        prefs.rememberBrightness(),
+                        v -> { prefs.setRememberBrightness(!prefs.rememberBrightness()); showMe(); }));
+                break;
+            }
+            case 4: {
+                col.addView(bigText("Gestures"));
                 col.addView(toggleRow("Gesture operation",
                         "Control brightness, volume and seek by swiping",
                         prefs.gesturesOn(),
                         v -> { prefs.setGesturesOn(!prefs.gesturesOn()); showMe(); }));
-                col.addView(toggleRow("Continuous play",
-                        "Play the next video automatically after one ends",
-                        prefs.continuous(),
-                        v -> { prefs.setContinuous(!prefs.continuous()); showMe(); }));
-                col.addView(toggleRow("Auto pop-up play",
-                        "Continue in a floating window when you switch to other apps",
-                        prefs.autoPip(),
-                        v -> { prefs.setAutoPip(!prefs.autoPip()); showMe(); }));
                 col.addView(toggleRow("Double-tap to seek",
                         "Double-tap the sides to fast forward or rewind",
                         prefs.doubleTapOn(),
@@ -2730,59 +3127,120 @@ public class MainActivity extends Activity {
                         "Vibrate when the long-press accelerator starts",
                         prefs.longPressVibrate(),
                         v -> { prefs.setLongPressVibrate(!prefs.longPressVibrate()); showMe(); }));
-                col.addView(row(0, "Subtitle size", "Size of burned subtitle text",
-                        new String[]{"Small", "Normal", "Large"}[prefs.subtitleSize()] + " ›",
-                        v -> choiceDialog("Subtitle size",
-                                new String[]{"Small", "Normal", "Large"},
-                                prefs.subtitleSize(),
-                                i -> { prefs.setSubtitleSize(i); showMe(); })));
                 break;
             }
-            case 3: {
-                col.addView(bigText("Library"));
-                col.addView(dimText("Grid columns"));
-                col.addView(chips(new String[]{"2", "3"}, prefs.gridCols() == 2 ? 0 : 1,
-                        i -> prefs.setGridCols(i == 0 ? 2 : 3)));
-                col.addView(dimText("Library view"));
-                col.addView(chips(new String[]{"Grid", "List"}, prefs.listMode() ? 1 : 0,
-                        i -> prefs.setListMode(i == 1)));
-                col.addView(row(0, "Manage your scan list",
-                        "Hide or show video folders in TM Player",
-                        prefs.hiddenFolders().size() + " hidden ›",
-                        v -> showHiddenFoldersDialog()));
-                col.addView(row(0, "All files access", "Needed on some phones for USB drives", "›",
+            case 5: {
+                col.addView(bigText("Audio"));
+                col.addView(sectionLabel("Playback"));
+                col.addView(toggleRow("Require audio focus",
+                        "Pause other players while this player is playing videos, and vice versa",
+                        prefs.audioFocus(),
+                        v -> { prefs.setAudioFocus(!prefs.audioFocus()); showMe(); }));
+                col.addView(toggleRow("Pause on disconnect",
+                        "Pause playback when headset disconnected from the device",
+                        prefs.pauseDisconnect(),
+                        v -> { prefs.setPauseDisconnect(!prefs.pauseDisconnect()); showMe(); }));
+                col.addView(toggleRow("System volume panel",
+                        "Show system volume panel while adjusting volume with headset on",
+                        prefs.sysVolPanel(),
+                        v -> { prefs.setSysVolPanel(!prefs.sysVolPanel()); showMe(); }));
+                col.addView(toggleRow("Volume boost",
+                        "Boost audio volume up to 200%",
+                        prefs.volBoost(),
+                        v -> { prefs.setVolBoost(!prefs.volBoost()); showMe(); }));
+                break;
+            }
+            case 6: {
+                col.addView(bigText("Subtitle"));
+                col.addView(sectionLabel("Appearance"));
+                final int[] subSizes = {14, 16, 17, 18, 20, 22, 24, 28, 32};
+                col.addView(row(0, "Subtitle text size", "Size of subtitle text",
+                        prefs.subTextSize() + " ›",
+                        v -> choiceDialog("Subtitle text size",
+                                new String[]{"14", "16", "17", "18", "20", "22", "24", "28", "32"},
+                                java.util.Arrays.asList(14, 16, 17, 18, 20, 22, 24, 28, 32)
+                                        .indexOf(prefs.subTextSize()),
+                                i -> { prefs.setSubTextSize(subSizes[i]); showMe(); })));
+                col.addView(row(0, "Subtitle font", "Font of subtitle text",
+                        new String[]{"Default", "Sans", "Serif", "Monospace"}[prefs.subFont()] + " ›",
+                        v -> choiceDialog("Subtitle font",
+                                new String[]{"Default", "Sans", "Serif", "Monospace"},
+                                prefs.subFont(),
+                                i -> { prefs.setSubFont(i); showMe(); })));
+                col.addView(toggleRow("Bold subtitle text",
+                        "Use bold text for subtitle",
+                        prefs.subBold(),
+                        v -> { prefs.setSubBold(!prefs.subBold()); showMe(); }));
+                col.addView(toggleRow("Subtitle background",
+                        "Enable background to subtitle text",
+                        prefs.subBg(),
+                        v -> { prefs.setSubBg(!prefs.subBg()); showMe(); }));
+                col.addView(row(0, "System caption style",
+                        "Open system captioning preferences", "›",
                         v -> {
-                            if (Build.VERSION.SDK_INT >= 30) {
-                                try {
-                                    startActivity(new Intent(
-                                            Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
-                                            Uri.parse("package:" + getPackageName())));
-                                } catch (Exception e) {
-                                    toast("Not available on this phone");
-                                }
-                            } else {
-                                toast("Already available on this Android version");
+                            try {
+                                startActivity(new Intent(Settings.ACTION_CAPTIONING_SETTINGS));
+                            } catch (Exception e) {
+                                toast("Not available on this phone");
                             }
                         }));
-                col.addView(button("Rescan library", v -> rescan()));
                 break;
             }
-            case 4: {
-                col.addView(bigText("Privacy"));
+            case 7: {
+                col.addView(bigText("General"));
                 col.addView(dimText("Vault fingerprint unlock"));
                 col.addView(chips(new String[]{"Off", "On"}, prefs.fingerprintUnlock() ? 1 : 0,
                         i -> prefs.setFingerprintUnlock(i == 1)));
                 col.addView(button("Change vault PIN", v -> changePinDialog()));
-                col.addView(dimText("Watch history"));
-                col.addView(button("Clear resume history", v -> {
+                col.addView(sectionLabel("User data"));
+                col.addView(button("Clear watch history", v -> {
                     prefs.clearHistory();
                     prefs.clearHistoryEntries();
                     toast("History cleared");
                 }));
+                col.addView(button("Clear playback positions", v -> {
+                    prefs.clearPositions();
+                    toast("Playback positions cleared");
+                }));
+                col.addView(button("Reset all settings", v -> confirm(
+                        "Reset all settings?",
+                        "Theme, playback and subtitle settings go back to defaults. Your videos and vault are not touched.",
+                        () -> { prefs.resetAll(); recreate(); })));
                 break;
             }
-            case 5: {
+            case 8: {
                 col.addView(bigText("About"));
+                LinearLayout brand = new LinearLayout(this);
+                brand.setOrientation(LinearLayout.HORIZONTAL);
+                brand.setGravity(Gravity.CENTER_VERTICAL);
+                GradientDrawable bg2 = new GradientDrawable();
+                bg2.setCornerRadius(dp(14));
+                bg2.setColor(cCard);
+                brand.setBackground(bg2);
+                brand.setPadding(dp(16), dp(14), dp(16), dp(14));
+                ImageView bicon = new ImageView(this);
+                bicon.setImageResource(R.drawable.ic_brand);
+                brand.addView(bicon, new LinearLayout.LayoutParams(dp(52), dp(52)));
+                LinearLayout btxt = new LinearLayout(this);
+                btxt.setOrientation(LinearLayout.VERTICAL);
+                btxt.setPadding(dp(14), 0, 0, 0);
+                TextView bn = new TextView(this);
+                bn.setText("TM Player");
+                bn.setTextColor(cText);
+                bn.setTextSize(18f);
+                bn.setTypeface(null, android.graphics.Typeface.BOLD);
+                btxt.addView(bn);
+                TextView bv = new TextView(this);
+                bv.setText("Version 0.1 • by MD. Muklash Mia");
+                bv.setTextColor(cDim);
+                bv.setTextSize(13f);
+                btxt.addView(bv);
+                brand.addView(btxt);
+                LinearLayout.LayoutParams blp = new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+                blp.setMargins(dp(14), dp(10), dp(14), dp(10));
+                brand.setLayoutParams(blp);
+                col.addView(brand);
                 LinearLayout dev = new LinearLayout(this);
                 dev.setOrientation(LinearLayout.VERTICAL);
                 GradientDrawable dg = new GradientDrawable();
@@ -2809,6 +3267,7 @@ public class MainActivity extends Activity {
                 col.addView(button("Telegram  @muklash_dev", v -> openUrl("https://t.me/muklash_dev")));
                 col.addView(button("GitHub  Muklash-Dev", v -> openUrl("https://github.com/Muklash-Dev")));
                 col.addView(button("About TM Player", v -> showAbout()));
+                col.addView(dimText("No third-party libraries — built with Android framework APIs only. Ads-free and open source."));
                 break;
             }
         }

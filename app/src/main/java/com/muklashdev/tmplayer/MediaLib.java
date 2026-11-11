@@ -153,6 +153,7 @@ public final class MediaLib {
             case 4: cmp = (a, b) -> Long.compare(b.size, a.size); break;
             case 5: cmp = (a, b) -> Long.compare(a.size, b.size); break;
             case 6: cmp = (a, b) -> Long.compare(b.duration, a.duration); break;
+            case 7: cmp = (a, b) -> Long.compare(a.duration, b.duration); break;
             default: cmp = (a, b) -> Long.compare(b.dateModified, a.dateModified); break;
         }
         Collections.sort(list, cmp);
@@ -266,7 +267,15 @@ public final class MediaLib {
                 MediaMetadataRetriever r = new MediaMetadataRetriever();
                 try {
                     r.setDataSource(v.filePath);
-                    Bitmap b = r.getFrameAtTime(1_000_000, MediaMetadataRetriever.OPTION_CLOSEST_SYNC);
+                    long tUs = 1_000_000;
+                    try {
+                        int tp = new Prefs(ctx).thumbPos();
+                        if (tp > 0 && v.duration > 0) {
+                            double fr = tp == 1 ? 0.10 : tp == 2 ? 0.25 : 0.50;
+                            tUs = (long) (v.duration * 1000L * fr);
+                        }
+                    } catch (Exception ignored) {}
+                    Bitmap b = r.getFrameAtTime(tUs, MediaMetadataRetriever.OPTION_CLOSEST_SYNC);
                     if (b != null) return b;
                 } finally {
                     r.release();
