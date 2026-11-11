@@ -1,0 +1,17 @@
+TM Player (Turbo Media Player) is a free, open-source and completely ad-free video and music player for Android, developed by MD. Muklash Mia.
+
+Videos and music are scanned across ALL storage volumes — internal storage, SD card and USB pendrives (OTG) — the libraries most players miss.
+
+Features:
+• PLAYit-style home: list or grid view, month grouping, sort by date, name, size or duration, watch history with one-tap clear
+• Folders, playlists and search across every volume
+• Gesture player: brightness / volume / seek swipes, double-tap skip (5–30 s), long-press speed boost, playback speeds 0.25x–4.0x
+• Screenshot button, HDR Enhance colour boost, picture-in-picture, background play, sleep timer
+• Music player with albums, artists, folders, playlists and a mini player
+• Private Vault: PIN + fingerprint lock for your videos, hidden from the gallery
+• Recycle Bin, Media Manage storage overview and a junk Clean page
+• Video to MP3/audio converter
+• Themes: dark/light, six accent colours and your own photo theme
+• No ads, no tracking, no accounts — your files never leave your phone
+
+TM Player is an original work built on Android's public media APIs. Playback uses your device's built-in codecs.

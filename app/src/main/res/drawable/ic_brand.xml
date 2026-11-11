@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Full TM Player logo tile (gradient rounded square + white mark) for in-app use -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path android:pathData="M26,4 h56 a22,22 0 0 1 22,22 v56 a22,22 0 0 1 -22,22 h-56 a22,22 0 0 1 -22,-22 v-56 a22,22 0 0 1 22,-22 z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="4"
+                android:startY="4"
+                android:endX="104"
+                android:endY="104">
+                <item android:offset="0" android:color="#FF22D3EE" />
+                <item android:offset="0.55" android:color="#FF6366F1" />
+                <item android:offset="1" android:color="#FFA855F7" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <!-- ring -->
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M54,21 a25,25 0 1,0 0.01,0"
+        android:strokeWidth="5.5"
+        android:strokeColor="#FFFFFF" />
+    <!-- play triangle -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M47,37 q0,-2.2 2.6,-1 L64.8,44.9 q2.1,1.1 0,2.2 L49.6,56 Q47,57.2 47,55 Z" />
+    <!-- T -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M37.5,75 h14 v3.6 h-5.2 v10.4 h-3.6 V78.6 h-5.2 Z" />
+    <!-- M -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54.5,89 L54.5,75 L58.1,75 L62.5,81.8 L66.9,75 L70.5,75 L70.5,89 L66.7,89 L66.7,79.8 L62.5,85.4 L58.3,79.8 L58.3,89 Z" />
+</vector>

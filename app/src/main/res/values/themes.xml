@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="AppThemeDark" parent="@android:style/Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/bg_dark</item>
+        <item name="android:statusBarColor">@color/bg_dark</item>
+        <item name="android:navigationBarColor">@color/bg_dark</item>
+        <item name="android:colorAccent">@color/accent_default</item>
+        <item name="android:textColorPrimary">@color/text_dark</item>
+        <item name="android:textColorSecondary">@color/text_dark_dim</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+
+    <style name="AppThemeLight" parent="@android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/bg_light</item>
+        <item name="android:statusBarColor">@color/bg_light</item>
+        <item name="android:navigationBarColor">@color/bg_light</item>
+        <item name="android:colorAccent">@color/accent_default</item>
+        <item name="android:textColorPrimary">@color/text_light</item>
+        <item name="android:textColorSecondary">@color/text_light_dim</item>
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
+
+    <style name="PlayerTheme" parent="@android:style/Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/player_bg</item>
+        <item name="android:statusBarColor">@color/player_bg</item>
+        <item name="android:navigationBarColor">@color/player_bg</item>
+        <item name="android:colorAccent">@color/accent_default</item>
+        <item name="android:textColorPrimary">#FFFFFF</item>
+        <item name="android:windowFullscreen">true</item>
+    </style>
+</resources>
