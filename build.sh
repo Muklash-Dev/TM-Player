@@ -2,15 +2,15 @@
 # Manual release build for TM Player - no Gradle required.
 # Produces app/build/outputs/tm-player-release.apk
 #
-# Requirements: JDK 17, Android SDK platform android-34 + build-tools 34.0.0.
+# Requirements: JDK 17, Android SDK platform android-37 + build-tools 37.0.0.
 # Signing (optional): set KEYSTORE, KS_ALIAS, KS_PASS, KEY_PASS env vars.
 # Without them an unsigned APK is produced (install after your own signing).
 set -e
 cd "$(dirname "$0")"
 
 SDK="${ANDROID_SDK_ROOT:-$HOME/Android/Sdk}"
-BT="$SDK/build-tools/34.0.0"
-AJAR="$SDK/platforms/android-34/android.jar"
+BT="$SDK/build-tools/37.0.0"
+AJAR="$SDK/platforms/android-37/android.jar"
 SRC="app/src/main"
 OUT="app/build/outputs"
 WORK="app/build/manual"

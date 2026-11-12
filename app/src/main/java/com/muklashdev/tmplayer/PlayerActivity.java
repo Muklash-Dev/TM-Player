@@ -145,6 +145,21 @@ public class PlayerActivity extends Activity implements TextureView.SurfaceTextu
         topBar = findViewById(R.id.top_bar);
         centerControls = findViewById(R.id.center_controls);
         bottomBar = findViewById(R.id.bottom_bar);
+        Edge.padTop(topBar);
+        Edge.padBottom(bottomBar);
+        // Back handling for Android 13+ (targetSdk 36 and above no longer call onBackPressed)
+        if (android.os.Build.VERSION.SDK_INT >= 33) {
+            getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
+                    android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT,
+                    () -> {
+                        if (bgMode && mp != null && prepared) {
+                            moveTaskToBack(true);
+                            toast("Playing in the background — open the notification to come back");
+                        } else {
+                            finish();
+                        }
+                    });
+        }
         titleTv = findViewById(R.id.player_title);
         gestureLabel = findViewById(R.id.gesture_label);
         subtitleTv = findViewById(R.id.subtitle_text);

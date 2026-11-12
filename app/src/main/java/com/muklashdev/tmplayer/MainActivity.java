@@ -116,6 +116,7 @@ public class MainActivity extends Activity {
         prefs = new Prefs(this);
         setTheme(prefs.isDark(this) ? R.style.AppThemeDark : R.style.AppThemeLight);
         setContentView(R.layout.activity_main);
+        Edge.pad(findViewById(R.id.main_root));
         computeColors();
 
         content = findViewById(R.id.content);

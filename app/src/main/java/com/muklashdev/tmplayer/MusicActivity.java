@@ -47,6 +47,7 @@ public class MusicActivity extends Activity implements MusicPlayer.Listener {
         root.setGravity(Gravity.CENTER_HORIZONTAL);
         root.setPadding(dp(28), dp(30), dp(28), dp(24));
         setContentView(root);
+        Edge.pad(root);
 
         // Top row: share (PLAYit puts it top-right too)
         LinearLayout topRow = new LinearLayout(this);
