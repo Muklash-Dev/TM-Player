@@ -132,6 +132,11 @@ public class MainActivity extends Activity {
             final int tab = i;
             navItems[i].setOnClickListener(v -> showTab(tab));
         }
+        View navBrowser = findViewById(R.id.nav_browser);
+        ((ImageView) ((ViewGroup) navBrowser).getChildAt(0)).setColorFilter(cDim);
+        ((TextView) ((ViewGroup) navBrowser).getChildAt(1)).setTextColor(cDim);
+        navBrowser.setOnClickListener(v ->
+                startActivity(new Intent(this, BrowserActivity.class)));
         styleChrome();
         applyCustomBg();
 

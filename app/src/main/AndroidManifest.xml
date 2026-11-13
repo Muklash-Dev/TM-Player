@@ -1,13 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.muklashdev.tmplayer"
-    android:versionCode="10"
-    android:versionName="0.1">
+    android:versionCode="35"
+    android:versionName="0.2">
 
     <uses-sdk
         android:minSdkVersion="26"
         android:targetSdkVersion="37" />
 
+    <!-- Built-in browser (user-initiated browsing and downloads only; no ads/tracking) -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- GeckoView engine requirements -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
     <!-- Media access: modern (33+) and legacy (up to 32) -->
     <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
     <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
@@ -15,6 +20,7 @@
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Optional fingerprint unlock for the vault -->
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
@@ -34,6 +40,7 @@
         android:label="@string/app_name"
         android:requestLegacyExternalStorage="true"
         android:supportsRtl="true"
+        android:usesCleartextTraffic="true"
         android:theme="@style/AppThemeDark">
 
         <activity
@@ -68,9 +75,21 @@
             android:exported="false"
             android:configChanges="orientation|screenSize|keyboardHidden" />
 
+        <activity
+            android:name=".BrowserActivity"
+            android:exported="false"
+            android:launchMode="singleTop"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
+
         <service
             android:name=".BgPlayService"
             android:exported="false"
             android:foregroundServiceType="mediaPlayback" />
+
+        <service
+            android:name=".TmDownloadService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+
     </application>
 </manifest>

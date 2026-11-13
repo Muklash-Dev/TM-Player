@@ -1,9 +1,11 @@
 # TM Player
 
-**TM Player (Turbo Media Player)** — a fast, customizable video player for
-Android with a private vault, built only on Android's own media APIs.
+**TM Player (Turbo Media Player)** — a fast, customizable video and music
+player for Android with a **built-in web browser (TM Browser)**, a private
+vault, and a full download manager, built only on Android's own APIs.
 
-**Layout (PLAYit-style):** bottom tabs **Video / Music / Vault / Me**; the
+**Layout (PLAYit-style):** bottom tabs **Video / Music / Vault / Me** plus a
+**Browser** tab that opens TM Browser; the
 Video section has its own top tabs (**Video / Folder / Playlist**); the
 **Me** page is a feature hub with a Theme page (all themes free), Media
 Manage (storage usage, watched / largest / unwatched videos), a Recycle
@@ -37,6 +39,21 @@ Developed by **MD. Muklash Mia**
 
 ## Features
 
+- **TM Browser (new in v0.2)** — a built-in browser on the system WebView:
+  tabs + incognito tabs, bookmarks, day-grouped history, find in page,
+  desktop / mobile mode, night mode, text size, orientation lock, saved
+  pages for offline reading, view source, add-to-home-screen shortcuts,
+  and search engines (Google, DuckDuckGo, Bing, Yahoo, Startpage, Ecosia,
+  Qwant, Yandex — plus your own custom engines).
+- **Ad & popup blocking** — a bundled 30,000-domain blocklist (from the
+  Steven Black hosts project) plus optional ad-blocking DNS (DoH presets
+  incl. AdGuard); gesture-less popup navigations to ad hosts are killed.
+- **Download manager** — foreground-service downloads with live progress
+  and speed, pause / resume (HTTP Range), cancel, delete, background
+  downloading with a progress notification, and a **download folder you
+  can change** (internal storage or any SD-card folder via SAF). A page
+  media finder lists the videos, images and files a page offers for
+  direct play or download.
 - **All storage** — scans internal storage, SD card **and USB pendrives**
   (every mounted volume, unlike many players). Plus *Browse any folder*
   for anything the media library has not indexed.
@@ -76,7 +93,7 @@ ready-to-install APK.
 Pure Android framework APIs — no third-party dependencies.
 
 ```sh
-./build.sh        # manual build (JDK 17 + Android SDK 34), or
+./build.sh        # manual build (JDK 17 + Android SDK 37; min Android 8, target Android 17), or
 # open the project in Android Studio and run the app module
 ```
 

@@ -1,8 +1,16 @@
-TM Player (Turbo Media Player) is a free, open-source and completely ad-free video and music player for Android, developed by MD. Muklash Mia.
+TM Player (Turbo Media Player) is a free, open-source and completely ad-free video and music player for Android with a built-in web browser, developed by MD. Muklash Mia.
 
-Videos and music are scanned across ALL storage volumes — internal storage, SD card and USB pendrives (OTG) — the libraries most players miss.
+Videos and music are scanned across ALL storage volumes — internal storage, SD card and USB pendrives (OTG).
 
-Features:
+TM Browser (new in v0.2):
+• Tabs and incognito tabs, bookmarks and history grouped by day
+• Ad and popup blocking with a 30,000-domain blocklist and optional ad-blocking DNS
+• Download manager: live progress and speed, pause / resume, background downloads with notifications, and a download folder you can change (SD card supported)
+• Page media finder — play or download the videos, images and files a page offers
+• Saved pages for offline reading, desktop / mobile mode, night mode, text size, orientation lock
+• Search engines: Google, DuckDuckGo, Bing and more, plus your own custom engines
+
+Player features:
 • PLAYit-style home: list or grid view, month grouping, sort by date, name, size or duration, watch history with one-tap clear
 • Folders, playlists and search across every volume
 • Gesture player: brightness / volume / seek swipes, double-tap skip (5–30 s), long-press speed boost, playback speeds 0.25x–4.0x
@@ -12,6 +20,6 @@ Features:
 • Recycle Bin, Media Manage storage overview and a junk Clean page
 • Video to MP3/audio converter
 • Themes: dark/light, six accent colours and your own photo theme
-• No ads, no tracking, no accounts — your files never leave your phone
+• No ads, no tracking, no accounts. The player works fully offline; the browser only connects to the websites you open
 
-TM Player is an original work built on Android's public media APIs. Playback uses your device's built-in codecs.
+TM Player is an original work built on Android's public media APIs. Playback uses your device's built-in codecs. Works on Android 8–17.

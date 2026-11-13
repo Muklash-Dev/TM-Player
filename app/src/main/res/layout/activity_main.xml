@@ -214,6 +214,27 @@
         </LinearLayout>
 
         <LinearLayout
+            android:id="@+id/nav_browser"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:padding="4dp">
+
+            <ImageView
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:src="@drawable/ic_nav_browser" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Browser"
+                android:textSize="11sp" />
+        </LinearLayout>
+
+        <LinearLayout
             android:id="@+id/nav_me"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
