@@ -2621,6 +2621,12 @@ public class MainActivity extends Activity {
                                     + "https://github.com/Muklash-Dev/TM-Player");
                     startActivity(Intent.createChooser(s, "Share TM Player"));
                 }));
+        String curVer = "";
+        try { curVer = " — you're on v" + getPackageManager()
+                .getPackageInfo(getPackageName(), 0).versionName; } catch (Exception ignored) {}
+        col.addView(row(R.drawable.ic_update, "Check for updates",
+                "Get the newest TM Player from GitHub" + curVer, "›",
+                v -> Updater.check(this, true)));
         col.addView(row(R.drawable.ic_person, "Help & Feedback", "Telegram: @muklash_dev", "›",
                 v -> openUrl("https://t.me/muklash_dev")));
         col.addView(row(R.drawable.ic_history, "Rate / Star on GitHub", "github.com/Muklash-Dev/TM-Player", "›",
