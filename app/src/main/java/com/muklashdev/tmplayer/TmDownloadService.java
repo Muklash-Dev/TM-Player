@@ -22,6 +22,7 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.Locale;
 import java.net.HttpURLConnection;
 import java.net.UnknownHostException;
 import java.util.concurrent.ConcurrentHashMap;
@@ -323,6 +324,16 @@ public class TmDownloadService extends Service {
                     String m = c.getContentType();
                     if (m != null) t.mime = m.split(";")[0].trim();
                 }
+                // The server's own filename (final response, after redirects)
+                // beats every guess — this is what SourceForge mirrors send.
+                String cdName = BrowserActivity.filenameFromDisposition(
+                        c.getHeaderField("Content-Disposition"));
+                if (cdName != null && (t.name == null || t.name.isEmpty()
+                        || t.name.equals("download")
+                        || t.name.toLowerCase(Locale.ROOT).endsWith(".bin")
+                        || !BrowserActivity.DohFetch.hasExtension(t.name))) {
+                    t.name = cdName;
+                }
                 if (t.name == null || t.name.isEmpty() || t.name.equals("download"))
                     t.name = BrowserActivity.filenameFromUrl(t.url);
                 if (!BrowserActivity.DohFetch.hasExtension(t.name) && t.mime != null) {
@@ -371,6 +382,8 @@ public class TmDownloadService extends Service {
                     msg(t, "Download stopped — tap Resume to continue: " + t.name);
                     return;
                 }
+                t.name = BrowserActivity.correctExtensionByMagic(t.temp, t.name);
+                savePersisted(app);
                 FileInputStream fin = new FileInputStream(t.temp);
                 try {
                     BrowserActivity.saveStream(app, fin, t.name, t.mime);

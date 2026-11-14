@@ -10,7 +10,7 @@ public final class Prefs {
     public static final int[] ACCENTS = {
             0xFF19C8E8, // cyan (logo)
             0xFF8B7CF6, // violet
-            0xFF2DD4BF, // teal
+            0xFF3DBFA8, // teal (design sheet)
             0xFFFB923C, // orange
             0xFFF472B6, // pink
             0xFF4ADE80  // green
@@ -131,10 +131,13 @@ public final class Prefs {
         sp = ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE);
     }
 
-    public int accentIndex() { return sp.getInt("accent", 0); }
+    public int accentIndex() { return sp.getInt("accent", 2); }
     public void setAccentIndex(int i) { sp.edit().putInt("accent", i).remove("accent_argb").apply(); }
     public int accent() { int c = sp.getInt("accent_argb", 0); return c != 0 ? c : ACCENTS[Math.max(0, Math.min(accentIndex(), ACCENTS.length - 1))]; }
     public void setAccentColor(int argb) { sp.edit().putInt("accent_argb", argb).apply(); }
+    /** Home icon style: 0 Aero Neon (outline on card), 1 Material You (filled), 2 Flat Minimal. */
+    public int iconPack() { return sp.getInt("icon_pack", 0); }
+    public void setIconPack(int i) { sp.edit().putInt("icon_pack", i).apply(); }
 
     public boolean darkTheme() { return sp.getBoolean("dark", true); }
     public void setDarkTheme(boolean d) { sp.edit().putBoolean("dark", d).apply(); }
@@ -227,6 +230,55 @@ public final class Prefs {
 
     public boolean fingerprintUnlock() { return sp.getBoolean("vault_fp", true); }
     public void setFingerprintUnlock(boolean b) { sp.edit().putBoolean("vault_fp", b).apply(); }
+
+    // ---- extra vault unlock methods (password / pattern) ----
+    public String pwdHash() { return sp.getString("vault_pwd", null); }
+    public void setPwdHash(String h) {
+        if (h == null) sp.edit().remove("vault_pwd").apply();
+        else sp.edit().putString("vault_pwd", h).apply();
+    }
+    public String patternHash() { return sp.getString("vault_pattern", null); }
+    public void setPatternHash(String h) {
+        if (h == null) sp.edit().remove("vault_pattern").apply();
+        else sp.edit().putString("vault_pattern", h).apply();
+    }
+    // ---- AI assistant (bring-your-own-key; keys stay on this device) ----
+    public int assistantProvider() { return sp.getInt("ai_provider", 0); }
+    public void setAssistantProvider(int p) { sp.edit().putInt("ai_provider", p).apply(); }
+    public String assistantKey(int provider) {
+        return sp.getString(provider == 0 ? "ai_key_gemini" : "ai_key_oai", "");
+    }
+    public void setAssistantKey(int provider, String k) {
+        sp.edit().putString(provider == 0 ? "ai_key_gemini" : "ai_key_oai", k).apply();
+    }
+    public String assistantModel(int provider) {
+        return sp.getString(provider == 0 ? "ai_model_gemini" : "ai_model_oai",
+                provider == 0 ? "gemini-2.5-flash" : "gpt-4o-mini");
+    }
+    public void setAssistantModel(int provider, String m) {
+        sp.edit().putString(provider == 0 ? "ai_model_gemini" : "ai_model_oai", m).apply();
+    }
+    public String assistantBaseUrl() { return sp.getString("ai_base_url", "https://api.openai.com/v1"); }
+    // generic custom-AI credentials (any OpenAI-compatible endpoint)
+    public String assistantKey() { return sp.getString("ai_key_custom", ""); }
+    public void setAssistantKey(String k) { sp.edit().putString("ai_key_custom", k).apply(); }
+    public String assistantModel() { return sp.getString("ai_model_custom", "gpt-4o-mini"); }
+    public boolean updateAuto() { return sp.getBoolean("update_auto", true); }
+    public void setUpdateAuto(boolean b) { sp.edit().putBoolean("update_auto", b).apply(); }
+    public long lastUpdateCheck() { return sp.getLong("update_last_check", 0); }
+    public void setLastUpdateCheck(long t) { sp.edit().putLong("update_last_check", t).apply(); }
+
+    /** User-added AI Hub tiles, JSON array of {"n":name,"u":url}. */
+    public String assistantHubCustom() { return sp.getString("ai_hub_custom", "[]"); }
+    public void setAssistantHubCustom(String json) { sp.edit().putString("ai_hub_custom", json).apply(); }
+    public boolean assistantSpeak() { return sp.getBoolean("ai_speak", false); }
+    public void setAssistantSpeak(boolean b) { sp.edit().putBoolean("ai_speak", b).apply(); }
+    public void setAssistantModel(String m) { sp.edit().putString("ai_model_custom", m).apply(); }
+    public void setAssistantBaseUrl(String u) { sp.edit().putString("ai_base_url", u).apply(); }
+
+    /** Last-used vault unlock method: 0 PIN, 1 password, 2 pattern, 3 biometric. */
+    public int lockMethod() { return sp.getInt("vault_method", 0); }
+    public void setLockMethod(int m) { sp.edit().putInt("vault_method", m).apply(); }
 
     // ---- watch history (newest first, "uri<US>name<US>timeMs" joined by <RS>) ----
     private static final String US = "\u0003";

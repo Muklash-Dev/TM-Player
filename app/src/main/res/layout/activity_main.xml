@@ -137,6 +137,14 @@
             android:layout_height="42dp"
             android:background="?android:attr/selectableItemBackgroundBorderless"
             android:src="@drawable/ic_next" />
+
+        <ImageButton
+            android:id="@+id/mini_close"
+            android:layout_width="42dp"
+            android:layout_height="42dp"
+            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:padding="11dp"
+            android:src="@drawable/ic_close" />
     </LinearLayout>
 
     <!-- Bottom navigation -->
@@ -213,6 +221,7 @@
                 android:textSize="11sp" />
         </LinearLayout>
 
+
         <LinearLayout
             android:id="@+id/nav_browser"
             android:layout_width="0dp"
@@ -231,6 +240,27 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Browser"
+                android:textSize="11sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/nav_games"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:padding="4dp">
+
+            <ImageView
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:src="@drawable/ic_nav_games" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Games"
                 android:textSize="11sp" />
         </LinearLayout>
 

@@ -132,11 +132,24 @@ public final class MusicPlayer {
     }
 
     public void toggle() {
-        if (mp == null || !prepared) return;
+        if (mp == null || !prepared) {
+            // Player was released (e.g. notification Close) — restart the track.
+            if (index >= 0 && index < queue.size()) playAt(index);
+            return;
+        }
         try {
             if (mp.isPlaying()) mp.pause(); else mp.start();
             notifyPlay();
         } catch (Exception ignored) {}
+    }
+
+    /** Stops playback, releases the player and clears the queue,
+        so nothing (mini player, notification) lingers afterwards. */
+    public void stopPlayback() {
+        release();
+        queue.clear();
+        index = -1;
+        notifyPlay();
     }
 
     public void seekTo(int ms) {
@@ -153,6 +166,14 @@ public final class MusicPlayer {
         prepared = false;
     }
 
-    private void notifyTrack() { if (listener != null) listener.onTrackChanged(); notifyPlay(); }
-    private void notifyPlay() { if (listener != null) listener.onPlayStateChanged(); }
+    private void notifyTrack() {
+        if (listener != null) listener.onTrackChanged();
+        MusicService.sync(appCtx);
+        notifyPlay();
+    }
+
+    private void notifyPlay() {
+        if (listener != null) listener.onPlayStateChanged();
+        MusicService.sync(appCtx);
+    }
 }

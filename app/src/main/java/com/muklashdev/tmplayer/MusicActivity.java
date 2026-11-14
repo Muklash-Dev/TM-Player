@@ -33,13 +33,20 @@ public class MusicActivity extends Activity implements MusicPlayer.Listener {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        // Android 13+: the music notification needs the runtime permission.
+        if (android.os.Build.VERSION.SDK_INT >= 33
+                && checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
+                        != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            try { requestPermissions(new String[]{android.Manifest.permission.POST_NOTIFICATIONS}, 992); }
+            catch (Exception ignored) {}
+        }
         prefs = new Prefs(this);
         setTheme(prefs.isDark(this) ? R.style.AppThemeDark : R.style.AppThemeLight);
         boolean d = prefs.isDark(this);
-        cText = d ? 0xFFF2F6FC : 0xFF0B1220;
-        cDim = d ? 0xFF93A3BC : 0xFF5A6B84;
+        cText = d ? 0xFFEAF0F8 : 0xFF0B1220;
+        cDim = d ? 0xFF93A3BA : 0xFF5A6B84;
         cAccent = prefs.accent();
-        cCard2 = d ? 0xFF182236 : 0xFFE8EEF6;
+        cCard2 = d ? 0xFF2A3650 : 0xFFE8EEF6;
         music = MusicPlayer.get(this);
 
         LinearLayout root = new LinearLayout(this);

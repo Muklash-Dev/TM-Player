@@ -4,14 +4,13 @@
 player for Android with a **built-in web browser (TM Browser)**, a private
 vault, and a full download manager, built only on Android's own APIs.
 
-**Layout (PLAYit-style):** bottom tabs **Video / Music / Vault / Me** plus a
-**Browser** tab that opens TM Browser; the
+**Layout (PLAYit-style):** bottom tabs **Video / Music / Vault / Browser / Games / Me**; the
 Video section has its own top tabs (**Video / Folder / Playlist**); the
 **Me** page is a feature hub with a Theme page (all themes free), Media
 Manage (storage usage, watched / largest / unwatched videos), a Recycle
 Bin, History, a PLAYit-style **Clean** page (APK files, thumbnails and
 cache scan with a one-tap clean) and an MP3 Converter shortcut. The Vault
-uses a numeric PIN pad with optional fingerprint unlock.
+unlocks with PIN, password, pattern, fingerprint or face.
 
 The home library can be shown as PLAYit-style rows (grouped by month) or
 as a grid, sorted by date, name, size or duration. The History strip on
@@ -36,6 +35,15 @@ Developed by **MD. Muklash Mia**
 - GitHub: [Muklash-Dev](https://github.com/Muklash-Dev)
 
 ![TM Player logo](https://github.com/Muklash-Dev/TM-Player/releases/download/v0.1/TMPlayer_Logo.jpg)
+
+## What's new in v0.3
+
+- **17 offline games** in a Games tab (2048, Ludo, Snakes & Ladders, Minesweeper, Carrom and more — Vs AI and 2-player modes)
+- **AI Hub** — ChatGPT, Gemini, Claude, DeepSeek, Grok, Perplexity, Copilot and Meta AI in one place with direct login, plus your own added AI sites
+- **Custom AI assistant with voice chat** — bring your own key for any OpenAI-compatible service
+- **TM Documents Reader** — PDF viewer (zoom to 300%) + merge, split, compress, rotate, watermark, page numbers, sign, images⇄PDF and metadata cleaning, all on-device
+- **QR code scanner**, **background music playback** with lock-screen controls, **auto-update** from GitHub releases, and **pull-to-refresh** on the home library
+- Downloads keep their **real file names and extensions** on every site, and app links (Play Store etc.) open installed apps with a web fallback
 
 ## Features
 

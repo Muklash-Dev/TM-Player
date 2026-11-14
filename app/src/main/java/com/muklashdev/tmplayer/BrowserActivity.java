@@ -242,6 +242,8 @@ public class BrowserActivity extends Activity {
     // ---------- views ----------
     FrameLayout stage;
     View homeView, panelView, tabsView, findBar, errorBar, menuView, settingsView, pageView, undoBar;
+    GridLayout dialGrid;
+    TextView mediaBadge;
     TextView errorText, netInfo, tabCountBtn, findCount, starBtn;
     EditText urlText, findText;
     ProgressBar progress;
@@ -289,7 +291,7 @@ public class BrowserActivity extends Activity {
         int themeOverride = bp.getInt("theme_override", -1);
         dark = themeOverride >= 0 ? themeOverride == 1 : prefs.isDark(this);
         cAccent = prefs.accent(this);
-        if (dark) { cBg = 0xFF0B0E13; cCard = 0xFF161B22; cCard2 = 0xFF212A35; cText = 0xFFF2F6FC; cDim = 0xFF9DADC6; }
+        if (dark) { cBg = 0xFF121826; cCard = 0xFF1A2336; cCard2 = 0xFF2A3650; cText = 0xFFEAF0F8; cDim = 0xFF93A3BA; }
         else { cBg = 0xFFF4F7FB; cCard = 0xFFFFFFFF; cCard2 = 0xFFE8EEF6; cText = 0xFF0B1220; cDim = 0xFF42536B; }
 
         Window w = getWindow();
@@ -417,6 +419,22 @@ public class BrowserActivity extends Activity {
         undoBar.setVisibility(View.GONE);
         stage.addView(undoBar);
 
+        // floating Page-media badge: appears when the current page offers
+        // downloadable media/files; tap opens the Page media panel.
+        mediaBadge = new TextView(this);
+        mediaBadge.setTextColor(0xFFFFFFFF);
+        mediaBadge.setTextSize(13);
+        mediaBadge.setTypeface(Typeface.DEFAULT_BOLD);
+        mediaBadge.setGravity(Gravity.CENTER);
+        mediaBadge.setBackground(circle(cAccent));
+        mediaBadge.setVisibility(View.GONE);
+        FrameLayout.LayoutParams mbp = new FrameLayout.LayoutParams(dp(46), dp(46));
+        mbp.gravity = Gravity.BOTTOM | Gravity.END;
+        mbp.setMargins(0, 0, dp(16), dp(88));
+        mediaBadge.setLayoutParams(mbp);
+        mediaBadge.setOnClickListener(v -> showPanel(3));
+        stage.addView(mediaBadge);
+
         findBar = buildFindBar();
         findBar.setVisibility(View.GONE);
         if (prefToolbarBottom) {
@@ -514,47 +532,12 @@ public class BrowserActivity extends Activity {
         col.setPadding(dp(14), dp(14), dp(14), dp(16));
         sv.addView(col);
 
-        // circular shortcuts, Kiwi-style
-        Object[][] sites = {
-                {"f", 0xFF1877F2, "Facebook", "https://m.facebook.com/"},
-                {"▶", 0xFFFF0000, "YouTube", "https://m.youtube.com/"},
-                {"G", 0xFF34A853, "Google", "https://www.google.com/"},
-                {"◎", 0xFFE1306C, "Instagram", "https://www.instagram.com/"},
-                {"♪", 0xFF111111, "TikTok", "https://www.tiktok.com/"},
-                {"𝕏", 0xFF111111, "X", "https://x.com/"},
-                {"W", 0xFF666666, "Wikipedia", "https://en.wikipedia.org/"},
-                {"a", 0xFFFF9900, "Amazon", "https://www.amazon.com/"},
-        };
-        GridLayout grid = new GridLayout(this);
-        grid.setColumnCount(4);
-        for (Object[] s : sites) {
-            LinearLayout cell = new LinearLayout(this);
-            cell.setOrientation(LinearLayout.VERTICAL);
-            cell.setGravity(Gravity.CENTER);
-            cell.setPadding(dp(4), dp(8), dp(4), dp(8));
-            TextView icon = new TextView(this);
-            icon.setText((String) s[0]);
-            icon.setTextSize(19);
-            icon.setTextColor(0xFFFFFFFF);
-            icon.setTypeface(Typeface.DEFAULT_BOLD);
-            icon.setGravity(Gravity.CENTER);
-            icon.setBackground(circle((Integer) s[1]));
-            int sz = dp(52);
-            icon.setLayoutParams(new LinearLayout.LayoutParams(sz, sz));
-            cell.addView(icon);
-            TextView nm = label((String) s[2], 11, cDim, false);
-            nm.setGravity(Gravity.CENTER);
-            nm.setPadding(0, dp(5), 0, 0);
-            cell.addView(nm);
-            GridLayout.LayoutParams gp = new GridLayout.LayoutParams();
-            gp.width = 0;
-            gp.columnSpec = GridLayout.spec(GridLayout.UNDEFINED, 1f);
-            cell.setLayoutParams(gp);
-            final String u = (String) s[3];
-            cell.setOnClickListener(v -> navigate(u));
-            grid.addView(cell);
-        }
-        col.addView(grid);
+        // circular shortcuts, Kiwi-style — now fully editable (speed dial):
+        // tap opens, long-press edits/deletes, "+ Add" adds your own sites.
+        dialGrid = new GridLayout(this);
+        dialGrid.setColumnCount(4);
+        col.addView(dialGrid);
+        refreshDial();
 
         // Discover header + settings gear (Kiwi-style) — content = recent history
         LinearLayout dHead = new LinearLayout(this);
@@ -590,6 +573,192 @@ public class BrowserActivity extends Activity {
         infoCard.setOnClickListener(v -> runNetTest());
         col.addView(infoCard);
         return sv;
+    }
+
+    // ------------------------------------------------------------ speed dial
+    // Editable home shortcuts, persisted as JSON in prefs ("speed_dial").
+    // Entries: {n name, u url, g glyph, c color}
+    ArrayList<org.json.JSONObject> loadDial() {
+        ArrayList<org.json.JSONObject> out = new ArrayList<>();
+        try {
+            String raw = bp.getString("speed_dial", "");
+            if (!raw.isEmpty()) {
+                org.json.JSONArray arr = new org.json.JSONArray(raw);
+                for (int i = 0; i < arr.length(); i++) out.add(arr.getJSONObject(i));
+                return out;
+            }
+        } catch (Exception ignored) {}
+        Object[][] defs = {
+                {"Facebook", "https://m.facebook.com/", "f", 0xFF1877F2},
+                {"YouTube", "https://m.youtube.com/", "▶", 0xFFFF0000},
+                {"Google", "https://www.google.com/", "G", 0xFF34A853},
+                {"Instagram", "https://www.instagram.com/", "◎", 0xFFE1306C},
+                {"TikTok", "https://www.tiktok.com/", "♪", 0xFF111111},
+                {"X", "https://x.com/", "𝕏", 0xFF111111},
+                {"Wikipedia", "https://en.wikipedia.org/", "W", 0xFF666666},
+                {"Amazon", "https://www.amazon.com/", "a", 0xFFFF9900},
+        };
+        try {
+            for (Object[] d : defs) {
+                org.json.JSONObject o = new org.json.JSONObject();
+                o.put("n", d[0]); o.put("u", d[1]); o.put("g", d[2]); o.put("c", d[3]);
+                out.add(o);
+            }
+        } catch (Exception ignored) {}
+        return out;
+    }
+
+    void saveDial(ArrayList<org.json.JSONObject> list) {
+        try {
+            org.json.JSONArray arr = new org.json.JSONArray();
+            for (org.json.JSONObject o : list) arr.put(o);
+            bp.edit().putString("speed_dial", arr.toString()).apply();
+        } catch (Exception ignored) {}
+    }
+
+    static final int[] DIAL_COLORS = {0xFF1877F2, 0xFFE1306C, 0xFF34A853, 0xFFFF9900,
+            0xFF7C5CFF, 0xFF00ACC1, 0xFFEF5350, 0xFF5C6BC0};
+
+    void refreshDial() {
+        if (dialGrid == null) return;
+        dialGrid.removeAllViews();
+        final ArrayList<org.json.JSONObject> list = loadDial();
+        for (int i = 0; i < list.size(); i++) {
+            final int idx = i;
+            org.json.JSONObject o = list.get(i);
+            final String name = o.optString("n", "Site");
+            final String url = o.optString("u", "");
+            String glyph = o.optString("g", "");
+            if (glyph.isEmpty()) glyph = name.isEmpty() ? "?" : name.substring(0, 1).toUpperCase(Locale.ROOT);
+            int color = o.optInt("c", DIAL_COLORS[Math.abs(url.hashCode()) % DIAL_COLORS.length]);
+            LinearLayout cell = dialCell(glyph, color, name);
+            cell.setOnClickListener(v -> navigate(url));
+            cell.setOnLongClickListener(v -> {
+                chooser(name, url,
+                        new String[]{"Open", "Edit", "Delete"},
+                        new Runnable[]{
+                                () -> navigate(url),
+                                () -> showDialDialog(idx),
+                                () -> {
+                                    ArrayList<org.json.JSONObject> l2 = loadDial();
+                                    if (idx < l2.size()) l2.remove(idx);
+                                    saveDial(l2);
+                                    refreshDial();
+                                    toast("Shortcut deleted");
+                                }});
+                return true;
+            });
+            dialGrid.addView(cell);
+        }
+        if (list.size() < 16) {
+            LinearLayout add = dialCell("＋", 0xFF2A3648, "Add");
+            add.setOnClickListener(v -> showDialDialog(-1));
+            dialGrid.addView(add);
+        }
+    }
+
+    LinearLayout dialCell(String glyph, int color, String name) {
+        LinearLayout cell = new LinearLayout(this);
+        cell.setOrientation(LinearLayout.VERTICAL);
+        cell.setGravity(Gravity.CENTER);
+        cell.setPadding(dp(4), dp(8), dp(4), dp(8));
+        TextView icon = new TextView(this);
+        icon.setText(glyph);
+        icon.setTextSize(19);
+        icon.setTextColor(0xFFFFFFFF);
+        icon.setTypeface(Typeface.DEFAULT_BOLD);
+        icon.setGravity(Gravity.CENTER);
+        icon.setBackground(circle(color));
+        int sz = dp(52);
+        icon.setLayoutParams(new LinearLayout.LayoutParams(sz, sz));
+        cell.addView(icon);
+        TextView nm = label(name, 11, cDim, false);
+        nm.setGravity(Gravity.CENTER);
+        nm.setPadding(0, dp(5), 0, 0);
+        nm.setMaxLines(1);
+        cell.addView(nm);
+        GridLayout.LayoutParams gp = new GridLayout.LayoutParams();
+        gp.width = 0;
+        gp.columnSpec = GridLayout.spec(GridLayout.UNDEFINED, 1f);
+        cell.setLayoutParams(gp);
+        return cell;
+    }
+
+    void showDialDialog(final int editIdx) {
+        ArrayList<org.json.JSONObject> list = loadDial();
+        org.json.JSONObject cur = editIdx >= 0 && editIdx < list.size() ? list.get(editIdx) : null;
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(dp(20), dp(8), dp(20), 0);
+        final EditText nameIn = new EditText(this);
+        nameIn.setHint("Name (e.g. Facebook)");
+        nameIn.setSingleLine(true);
+        nameIn.setTextColor(cText);
+        nameIn.setHintTextColor(cDim);
+        if (cur != null) nameIn.setText(cur.optString("n", ""));
+        box.addView(nameIn);
+        final EditText urlIn = new EditText(this);
+        urlIn.setHint("URL (e.g. https://example.com)");
+        urlIn.setSingleLine(true);
+        urlIn.setTextColor(cText);
+        urlIn.setHintTextColor(cDim);
+        if (cur != null) urlIn.setText(cur.optString("u", ""));
+        box.addView(urlIn);
+        new AlertDialog.Builder(this)
+                .setTitle(editIdx >= 0 ? "Edit shortcut" : "Add shortcut")
+                .setView(box)
+                .setPositiveButton("Save", (d, w) -> {
+                    String n = nameIn.getText().toString().trim();
+                    String u = urlIn.getText().toString().trim();
+                    if (u.isEmpty()) { toast("Enter a URL"); return; }
+                    if (!u.contains("://")) u = "https://" + u;
+                    if (n.isEmpty()) {
+                        n = hostOf(u);
+                        if (n.startsWith("www.")) n = n.substring(4);
+                        if (n.startsWith("m.")) n = n.substring(2);
+                    }
+                    try {
+                        ArrayList<org.json.JSONObject> l2 = loadDial();
+                        org.json.JSONObject o = new org.json.JSONObject();
+                        o.put("n", n);
+                        o.put("u", u);
+                        o.put("g", n.isEmpty() ? "?" : n.substring(0, 1).toUpperCase(Locale.ROOT));
+                        o.put("c", DIAL_COLORS[Math.abs(u.hashCode()) % DIAL_COLORS.length]);
+                        if (editIdx >= 0 && editIdx < l2.size()) {
+                            // keep the original brand glyph/color when editing a default
+                            org.json.JSONObject old = l2.get(editIdx);
+                            o.put("g", old.optString("g", o.optString("g")));
+                            o.put("c", old.optInt("c", o.optInt("c")));
+                            l2.set(editIdx, o);
+                        } else {
+                            l2.add(o);
+                        }
+                        saveDial(l2);
+                        refreshDial();
+                        toast("Shortcut saved");
+                    } catch (Exception e) {
+                        toast("Could not save shortcut");
+                    }
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    void updateMediaBadge() {
+        if (mediaBadge == null) return;
+        BTab t = activeTab();
+        boolean anyOverlay = panelView.getVisibility() == View.VISIBLE
+                || tabsView.getVisibility() == View.VISIBLE
+                || settingsView.getVisibility() == View.VISIBLE
+                || menuView.getVisibility() == View.VISIBLE
+                || pageView.getVisibility() == View.VISIBLE;
+        int n = t == null ? 0 : t.sniffed.size();
+        if (t != null && !t.home && !anyOverlay && n > 0) {
+            mediaBadge.setText("⬇" + n);
+            mediaBadge.setVisibility(View.VISIBLE);
+        } else {
+            mediaBadge.setVisibility(View.GONE);
+        }
     }
 
     void refreshRecent() {
@@ -862,6 +1031,7 @@ public class BrowserActivity extends Activity {
         settingsView.setVisibility(View.GONE);
         pageView.setVisibility(View.GONE);
         fillPanel();
+        updateMediaBadge();
     }
 
     void fillPanel() {
@@ -2340,6 +2510,7 @@ public class BrowserActivity extends Activity {
                     syncUrlBar();
                     refreshStar();
                     syncBackBtn();
+                    updateMediaBadge();
                     ui.postDelayed(() -> captureThumb(tab), 350);
                 }
                 if (!tab.priv && url.startsWith("http") && !url.equals(tab.lastRecorded)) {
@@ -2430,9 +2601,19 @@ public class BrowserActivity extends Activity {
                 toast("This download type is not supported");
                 return;
             }
-            String name = URLUtil.guessFileName(url, contentDisposition, mimeType);
+            String name = filenameFromDisposition(contentDisposition);
+            if (name == null) name = URLUtil.guessFileName(url, contentDisposition, mimeType);
             if (name == null || name.isEmpty() || name.equals("download"))
                 name = filenameFromUrl(url);
+            if (name.toLowerCase(Locale.ROOT).endsWith(".bin")) {
+                // WebView guesses .bin whenever the MIME type is unknown; if the
+                // URL itself carries a real name with an extension, prefer it.
+                String fromUrl = filenameFromUrl(url);
+                if (DohFetch.hasExtension(fromUrl)
+                        && !fromUrl.toLowerCase(Locale.ROOT).endsWith(".bin")) {
+                    name = fromUrl;
+                }
+            }
             final String fname = name;
             chooser("Download file", fname,
                     new String[]{"⬇  Download", "▶  Play in TM Player"},
@@ -2543,6 +2724,7 @@ public class BrowserActivity extends Activity {
         settingsView.setVisibility(View.GONE);
         menuView.setVisibility(View.GONE);
         pageView.setVisibility(View.GONE);
+        updateMediaBadge();
     }
 
     void newTab(boolean priv, String url) {
@@ -3071,10 +3253,59 @@ public class BrowserActivity extends Activity {
     }
 
     void openExternal(String u) {
+        // intent:// — used by most "Open in app" buttons (Play Store, YouTube, maps…).
+        // Try the app; if it is missing, fall back to the page's own fallback URL,
+        // or to that app's Play Store web page — never a dead end.
+        if (u.startsWith("intent://") || u.startsWith("intent:")) {
+            try {
+                Intent it = Intent.parseUri(u, Intent.URI_INTENT_SCHEME);
+                it.addCategory(Intent.CATEGORY_BROWSABLE);
+                it.setComponent(null);
+                it.setSelector(null);
+                try {
+                    startActivity(it);
+                    return;
+                } catch (Exception e) {
+                    String fb = it.getStringExtra("browser_fallback_url");
+                    if (fb != null && (fb.startsWith("http://") || fb.startsWith("https://"))) {
+                        navigate(fb);
+                        return;
+                    }
+                    String pkg = it.getPackage();
+                    if (pkg != null && !pkg.isEmpty()) {
+                        navigate("https://play.google.com/store/apps/details?id=" + pkg);
+                        toast("App not installed — opened its Play Store page");
+                        return;
+                    }
+                }
+            } catch (Exception ignored) {}
+            toast("No installed app can open this link");
+            return;
+        }
+        // market:// — the Play Store app if present, otherwise the same app page on the web.
+        if (u.startsWith("market://")) {
+            try {
+                startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(u)));
+                return;
+            } catch (Exception e) {
+                String id = null;
+                try { id = Uri.parse(u).getQueryParameter("id"); } catch (Exception ignored) {}
+                if (id != null && !id.isEmpty()) {
+                    navigate("https://play.google.com/store/apps/details?id=" + id);
+                    toast("Play Store app not found — opened the web page instead");
+                    return;
+                }
+            }
+            toast("No installed app can open this link");
+            return;
+        }
+        // tel:, mailto:, sms:, geo:, tg:, whatsapp: and every other app scheme.
         try {
-            startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(u)));
+            Intent it = new Intent(Intent.ACTION_VIEW, Uri.parse(u));
+            it.addCategory(Intent.CATEGORY_BROWSABLE);
+            startActivity(it);
         } catch (Exception e) {
-            toast("No app can open this link");
+            toast("No installed app can open this link");
         }
     }
 
@@ -3119,10 +3350,99 @@ public class BrowserActivity extends Activity {
 
     static String filenameFromUrl(String u) {
         try {
-            String p = Uri.parse(u).getLastPathSegment();
+            Uri uri = Uri.parse(u);
+            String p = uri.getLastPathSegment();
+            if (p != null && (p.equals("download") || p.equals("downloadfile")
+                    || !p.contains("."))) {
+                // Sites like SourceForge put the real name one segment up:
+                // /NetHunter-ginkgo-3.zip/download
+                java.util.List<String> segs = uri.getPathSegments();
+                for (int i = segs.size() - 1; i >= 0; i--) {
+                    String sg = segs.get(i);
+                    if (sg != null && sg.contains(".") && !sg.equals(p)) {
+                        return Uri.decode(sg);
+                    }
+                }
+            }
             if (p != null && !p.isEmpty()) return Uri.decode(p);
         } catch (Exception ignored) {}
         return "download";
+    }
+
+    /** Parses the filename out of a Content-Disposition header (incl. RFC 5987). */
+    static String filenameFromDisposition(String cd) {
+        if (cd == null || cd.isEmpty()) return null;
+        try {
+            String low = cd.toLowerCase(Locale.ROOT);
+            int i = low.indexOf("filename*=");
+            if (i >= 0) {
+                String rest = cd.substring(i + "filename*=".length()).trim();
+                int semi = rest.indexOf(';');
+                if (semi >= 0) rest = rest.substring(0, semi).trim();
+                int q1 = rest.indexOf('\'');
+                int q2 = q1 >= 0 ? rest.indexOf('\'', q1 + 1) : -1;
+                String enc = q2 >= 0 ? rest.substring(q2 + 1) : rest;
+                return sanitizeFilename(Uri.decode(enc));
+            }
+            i = low.indexOf("filename=");
+            if (i >= 0) {
+                String rest = cd.substring(i + "filename=".length()).trim();
+                if (rest.startsWith("\"")) {
+                    int end = rest.indexOf('"', 1);
+                    if (end > 0) return sanitizeFilename(rest.substring(1, end));
+                }
+                int semi = rest.indexOf(';');
+                if (semi >= 0) rest = rest.substring(0, semi);
+                return sanitizeFilename(rest.trim());
+            }
+        } catch (Exception ignored) {}
+        return null;
+    }
+
+    static String sanitizeFilename(String n) {
+        if (n == null) return null;
+        n = n.replace('\\', '/');
+        int sl = n.lastIndexOf('/');
+        if (sl >= 0) n = n.substring(sl + 1);
+        n = n.replaceAll("[\\x00-\\x1f\\x7f]", "").trim();
+        return n.isEmpty() ? null : n;
+    }
+
+    /**
+     * Last line of defence against wrong extensions (the ".bin bug"): reads
+     * the file's magic bytes and, when the current name has only a generic
+     * extension (.bin/.dat/none), replaces it with the real one.
+     */
+    static String correctExtensionByMagic(java.io.File f, String name) {
+        if (f == null || name == null) return name;
+        try {
+            byte[] h = new byte[12];
+            int got;
+            try (java.io.FileInputStream in = new java.io.FileInputStream(f)) {
+                got = in.read(h);
+            }
+            if (got < 3) return name;
+            String ext = null;
+            if (h[0] == 0x50 && h[1] == 0x4B && h[2] == 0x03) ext = "zip";
+            else if (h[0] == 0x25 && h[1] == 0x50 && h[2] == 0x44 && h[3] == 0x46) ext = "pdf";
+            else if ((h[0] & 0xFF) == 0x1F && (h[1] & 0xFF) == 0x8B) ext = "gz";
+            else if ((h[0] & 0xFF) == 0xFF && (h[1] & 0xFF) == 0xD8) ext = "jpg";
+            else if ((h[0] & 0xFF) == 0x89 && h[1] == 0x50 && h[2] == 0x4E && h[3] == 0x47) ext = "png";
+            else if (got >= 8 && h[4] == 0x66 && h[5] == 0x74 && h[6] == 0x79 && h[7] == 0x70) ext = "mp4";
+            else if (h[0] == 0x49 && h[1] == 0x44 && h[2] == 0x33) ext = "mp3";
+            else if ((h[0] & 0xFF) == 0x37 && (h[1] & 0xFF) == 0x7A && (h[2] & 0xFF) == 0xBC) ext = "7z";
+            else if (h[0] == 0x52 && h[1] == 0x61 && h[2] == 0x72) ext = "rar";
+            if (ext == null) return name;
+            int d = name.lastIndexOf('.');
+            String cur = d > 0 ? name.substring(d + 1).toLowerCase(Locale.ROOT) : "";
+            if (cur.equals(ext) || cur.equals("apk") || cur.equals("jar")) return name;
+            boolean generic = cur.isEmpty() || cur.equals("bin") || cur.equals("dat")
+                    || cur.equals("download") || cur.equals("file");
+            if (!generic) return name;
+            return (d > 0 ? name.substring(0, d) : name) + "." + ext;
+        } catch (Exception ignored) {
+            return name;
+        }
     }
 
     void hideKeyboard() {

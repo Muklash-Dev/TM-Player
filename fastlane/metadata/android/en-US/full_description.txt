@@ -1,25 +1,36 @@
-TM Player (Turbo Media Player) is a free, open-source and completely ad-free video and music player for Android with a built-in web browser, developed by MD. Muklash Mia.
+TM Player (Turbo Media Player) is a free, open-source and completely ad-free video and music player for Android — with a built-in web browser, offline games, a document reader with PDF tools, and an AI assistant hub — developed by MD. Muklash Mia.
 
-Videos and music are scanned across ALL storage volumes — internal storage, SD card and USB pendrives (OTG).
+Videos and music are scanned across ALL storage volumes — internal storage, SD card and USB pendrives (OTG). Pull down on the home screen to refresh the library.
 
-TM Browser (new in v0.2):
-• Tabs and incognito tabs, bookmarks and history grouped by day
-• Ad and popup blocking with a 30,000-domain blocklist and optional ad-blocking DNS
-• Download manager: live progress and speed, pause / resume, background downloads with notifications, and a download folder you can change (SD card supported)
-• Page media finder — play or download the videos, images and files a page offers
-• Saved pages for offline reading, desktop / mobile mode, night mode, text size, orientation lock
-• Search engines: Google, DuckDuckGo, Bing and more, plus your own custom engines
+New in v0.3:
+•  17 offline games in their own tab — 2048, Ludo, Snakes & Ladders, Minesweeper, Carrom and more, with Vs AI and 2-player modes
+•  AI Hub: ChatGPT, Gemini, Claude, DeepSeek, Grok, Perplexity, Copilot and Meta AI in one place — log in with your own account, and add your own AI sites
+•  Custom AI assistant with voice chat — connect any OpenAI-compatible service with your own key (Groq, OpenRouter, DeepSeek, your own server…)
+•  TM Documents Reader: a PDF viewer (zoom to 300%, page jump) plus tools — merge, split / extract / reorder pages, compress, PDF to images, images to PDF, rotate, watermark, page numbers, signature stamping and metadata cleaning, all on-device
+•  QR code scanner (in the Me tab)
+•  Vault unlock your way: PIN, password, pattern, fingerprint or face
+•  Background music playback with lock-screen controls
+•  Auto-update: the app can check GitHub for new versions and update itself (optional, in Settings)
+
+TM Browser:
+•  Tabs and incognito tabs, bookmarks and history grouped by day
+•  Ad and popup blocking with a 30,000-domain blocklist and optional ad-blocking DNS
+•  Download manager: live progress and speed, pause / resume, background downloads with notifications, a download folder you can change (SD card supported) — and files keep their real names and extensions on every site
+•  Page media finder — play or download the videos, images and files a page offers
+•  Saved pages for offline reading, desktop / mobile mode, night mode, text size, orientation lock
+•  Search engines: Google, DuckDuckGo, Bing and more, plus your own custom engines
+•  App links behave: Play Store and other app links open the installed app when there is one, with a web fallback when there is not
 
 Player features:
-• PLAYit-style home: list or grid view, month grouping, sort by date, name, size or duration, watch history with one-tap clear
-• Folders, playlists and search across every volume
-• Gesture player: brightness / volume / seek swipes, double-tap skip (5–30 s), long-press speed boost, playback speeds 0.25x–4.0x
-• Screenshot button, HDR Enhance colour boost, picture-in-picture, background play, sleep timer
-• Music player with albums, artists, folders, playlists and a mini player
-• Private Vault: PIN + fingerprint lock for your videos, hidden from the gallery
-• Recycle Bin, Media Manage storage overview and a junk Clean page
-• Video to MP3/audio converter
-• Themes: dark/light, six accent colours and your own photo theme
-• No ads, no tracking, no accounts. The player works fully offline; the browser only connects to the websites you open
+•  PLAYit-style home: list or grid view, month grouping, sort by date, name, size or duration, watch history with one-tap clear
+•  Folders, playlists and search across every volume
+•  Gesture player: brightness / volume / seek swipes, double-tap skip (5–30 s), long-press speed boost, playback speeds 0.25x–4.0x
+•  Screenshot button, HDR Enhance colour boost, picture-in-picture, background play, sleep timer
+•  Music player with albums, artists, folders, playlists and a mini player
+•  Private Vault for your videos, hidden from the gallery
+•  Recycle Bin, Media Manage storage overview and a junk Clean page
+•  Video to MP3/audio converter
+•  Themes: dark/light, accent colours and your own photo theme
+•  No ads, no tracking, no accounts. The player, games and document tools work fully offline; the browser, AI features and the update check only connect when you use them. The camera is used only by the QR scanner.
 
-TM Player is an original work built on Android's public media APIs. Playback uses your device's built-in codecs. Works on Android 8–17.
+TM Player is an original work built on Android's public APIs (QR scanning uses the open-source ZXing library, Apache 2.0). Playback uses your device's built-in codecs. Works on Android 8–17.

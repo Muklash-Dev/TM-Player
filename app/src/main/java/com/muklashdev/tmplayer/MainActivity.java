@@ -25,6 +25,9 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.BaseAdapter;
+import android.graphics.Canvas;
+import android.graphics.Paint;
+import android.view.MotionEvent;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.GridView;
@@ -134,9 +137,23 @@ public class MainActivity extends Activity {
         }
         View navBrowser = findViewById(R.id.nav_browser);
         ((ImageView) ((ViewGroup) navBrowser).getChildAt(0)).setColorFilter(cDim);
-        ((TextView) ((ViewGroup) navBrowser).getChildAt(1)).setTextColor(cDim);
+        ((ViewGroup) navBrowser).getChildAt(1).setVisibility(View.GONE);
         navBrowser.setOnClickListener(v ->
                 startActivity(new Intent(this, BrowserActivity.class)));
+        View navGames = findViewById(R.id.nav_games);
+        ((ImageView) ((ViewGroup) navGames).getChildAt(0)).setColorFilter(cDim);
+        ((ViewGroup) navGames).getChildAt(1).setVisibility(View.GONE);
+        navGames.setOnClickListener(v ->
+                startActivity(new Intent(this, GamesActivity.class)));
+        for (int id : new int[]{R.id.nav_videos, R.id.nav_music, R.id.nav_vault,
+                R.id.nav_browser, R.id.nav_games, R.id.nav_me}) {
+            View it = findViewById(id);
+            if (it != null && it.getLayoutParams() instanceof LinearLayout.LayoutParams) {
+                LinearLayout.LayoutParams lp2 = (LinearLayout.LayoutParams) it.getLayoutParams();
+                lp2.setMargins(dp(4), dp(5), dp(4), dp(5));
+                it.setLayoutParams(lp2);
+            }
+        }
         styleChrome();
         applyCustomBg();
 
@@ -153,6 +170,12 @@ public class MainActivity extends Activity {
         miniPlay.setOnClickListener(v -> MusicPlayer.get(this).toggle());
         findViewById(R.id.mini_next).setOnClickListener(v -> MusicPlayer.get(this).next());
         miniPlayer.setOnClickListener(v -> startActivity(new Intent(this, MusicActivity.class)));
+        ImageButton miniClose = findViewById(R.id.mini_close);
+        miniClose.setColorFilter(cDim);
+        miniClose.setOnClickListener(v -> {
+            MusicPlayer.get(this).stopPlayback();
+            refreshMini();
+        });
 
         searchBox.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int a, int b, int c) {}
@@ -185,6 +208,7 @@ public class MainActivity extends Activity {
             showMessage("Allow media access to see your library.");
         }
         showTab(0);
+        Updater.checkAuto(this);
     }
 
     @Override
@@ -292,11 +316,11 @@ public class MainActivity extends Activity {
     private void computeColors() {
         boolean d = prefs.isDark(this);
         boolean hc = d && prefs.highContrast();
-        cBg = hc ? 0xFF000000 : d ? 0xFF070B14 : 0xFFF4F7FB;
-        cCard = hc ? 0xFF0B0B0B : d ? 0xFF101828 : 0xFFFFFFFF;
-        cCard2 = hc ? 0xFF161616 : d ? 0xFF182236 : 0xFFE8EEF6;
-        cText = d ? 0xFFF2F6FC : 0xFF0B1220;
-        cDim = d ? 0xFF9DADC6 : 0xFF42536B;
+        cBg = hc ? 0xFF000000 : d ? 0xFF121826 : 0xFFF4F7FB;
+        cCard = hc ? 0xFF0B0B0B : d ? 0xFF1A2336 : 0xFFFFFFFF;
+        cCard2 = hc ? 0xFF161616 : d ? 0xFF2A3650 : 0xFFE8EEF6;
+        cText = d ? 0xFFEAF0F8 : 0xFF0B1220;
+        cDim = d ? 0xFF93A3BA : 0xFF42536B;
         cAccent = prefs.accent(this);
     }
 
@@ -315,9 +339,35 @@ public class MainActivity extends Activity {
 
     private void updateNavStyles() {
         for (int i = 0; i < 4; i++) {
-            int col = i == currentTab ? cAccent : cDim;
-            navIcons[i].setColorFilter(col);
-            navLabels[i].setTextColor(col);
+            boolean active = i == currentTab;
+            int fg = active ? 0xFF0B1220 : cDim;
+            navIcons[i].setColorFilter(fg);
+            navLabels[i].setTextColor(fg);
+            navLabels[i].setVisibility(active ? View.VISIBLE : View.GONE);
+            View item = (View) navIcons[i].getParent();
+            if (active) {
+                GradientDrawable pill = new GradientDrawable();
+                pill.setColor(cAccent);
+                pill.setCornerRadius(dp(16));
+                item.setBackground(pill);
+            } else {
+                item.setBackground(null);
+            }
+        }
+        if (currentTab == 0) {
+            titleText.setText("Your videos");
+            int h = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY);
+            subtitleText.setText(h < 12 ? "Good morning"
+                    : h < 17 ? "Good afternoon" : "Good evening");
+        } else if (currentTab == 1) {
+            titleText.setText("Music");
+            subtitleText.setText("Your songs");
+        } else if (currentTab == 2) {
+            titleText.setText("Private Vault");
+            subtitleText.setText("Hidden from the gallery");
+        } else {
+            titleText.setText("Me");
+            subtitleText.setText("TM Player");
         }
         searchBox.setVisibility(currentTab <= 1 ? View.VISIBLE : View.GONE);
         searchBox.setHint(currentTab == 1 ? "Search music…" : "Search videos…");
@@ -357,6 +407,69 @@ public class MainActivity extends Activity {
             if (!hidden.contains(v.folderPath)) out.add(v);
         }
         return out;
+    }
+
+    // ------------------------------------------------------------ pull to refresh (home tabs)
+
+    private float ptrDownY = -1;
+    private boolean ptrArmed = false;
+    private boolean ptrInContent = false;
+
+    @Override
+    public boolean dispatchTouchEvent(MotionEvent ev) {
+        if (currentTab == 0 || currentTab == 1) {
+            switch (ev.getActionMasked()) {
+                case MotionEvent.ACTION_DOWN: {
+                    ptrDownY = ev.getRawY();
+                    ptrArmed = false;
+                    int[] loc = new int[2];
+                    content.getLocationOnScreen(loc);
+                    ptrInContent = ev.getRawY() >= loc[1];
+                    break;
+                }
+                case MotionEvent.ACTION_MOVE:
+                    if (ptrInContent && ptrDownY >= 0) {
+                        ptrArmed = ev.getRawY() - ptrDownY > dp(130) && isContentAtTop();
+                    }
+                    break;
+                case MotionEvent.ACTION_UP:
+                case MotionEvent.ACTION_CANCEL:
+                    if (ptrArmed) {
+                        ptrArmed = false;
+                        ptrDownY = -1;
+                        toast("Refreshing library…");
+                        rescan();
+                    }
+                    ptrDownY = -1;
+                    break;
+                default:
+                    break;
+            }
+        }
+        return super.dispatchTouchEvent(ev);
+    }
+
+    private boolean isContentAtTop() {
+        View sc = findScroller(content);
+        if (sc instanceof ScrollView) return ((ScrollView) sc).getScrollY() == 0;
+        if (sc instanceof android.widget.AbsListView) {
+            android.widget.AbsListView lv = (android.widget.AbsListView) sc;
+            return lv.getFirstVisiblePosition() == 0
+                    && (lv.getChildCount() == 0 || lv.getChildAt(0).getTop() >= 0);
+        }
+        return false;
+    }
+
+    private View findScroller(View v) {
+        if (v instanceof ScrollView || v instanceof android.widget.AbsListView) return v;
+        if (v instanceof ViewGroup) {
+            ViewGroup g = (ViewGroup) v;
+            for (int i = 0; i < g.getChildCount(); i++) {
+                View r = findScroller(g.getChildAt(i));
+                if (r != null) return r;
+            }
+        }
+        return null;
     }
 
     private void loadLibrary() {
@@ -702,6 +815,16 @@ public class MainActivity extends Activity {
             showVideoSection();
         }, false);
         bar.addView(seg, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+        TextView refBtn = new TextView(this);
+        refBtn.setText("↻");
+        refBtn.setTextColor(cText);
+        refBtn.setTextSize(20f);
+        refBtn.setPadding(dp(10), dp(8), dp(2), dp(8));
+        refBtn.setOnClickListener(v -> {
+            toast("Refreshing library…");
+            rescan();
+        });
+        bar.addView(refBtn);
         TextView sortBtn = new TextView(this);
         sortBtn.setText("⇅");
         sortBtn.setTextColor(cText);
@@ -1589,13 +1712,60 @@ public class MainActivity extends Activity {
             buildPinPad(col, "Create PIN to protect your privacy", true);
         } else if (!vaultUnlocked) {
             col.addView(bigText("Private Vault"));
-            buildPinPad(col, "Enter your PIN", false);
-            if (prefs.fingerprintUnlock() && fingerprintAvailable()) {
-                col.addView(button("Use fingerprint", v -> promptFingerprint()));
+            boolean bio = prefs.fingerprintUnlock() && fingerprintAvailable();
+            boolean hasPwd = prefs.pwdHash() != null;
+            boolean hasPat = prefs.patternHash() != null;
+            int method = prefs.lockMethod();
+            if (method == 1 && !hasPwd) method = 0;
+            if (method == 2 && !hasPat) method = 0;
+            if (method == 3 && !bio) method = 0;
+            ArrayList<String> names = new ArrayList<>();
+            ArrayList<Integer> kinds = new ArrayList<>();
+            names.add("PIN"); kinds.add(0);
+            if (hasPwd) { names.add("Password"); kinds.add(1); }
+            if (hasPat) { names.add("Pattern"); kinds.add(2); }
+            if (bio) { names.add("Fingerprint / Face"); kinds.add(3); }
+            if (names.size() > 1) {
+                int sel = Math.max(0, kinds.indexOf(method));
+                col.addView(chips(names.toArray(new String[0]), sel, i -> {
+                    int k = kinds.get(i);
+                    prefs.setLockMethod(k);
+                    if (k == 3) promptFingerprint();
+                    else showVault();
+                }));
+            }
+            if (method == 1) {
+                buildPasswordUnlock(col);
+            } else if (method == 2) {
+                buildPatternUnlock(col);
+            } else if (method == 3) {
+                col.addView(dimText("Use your fingerprint or face to open the vault."));
+                col.addView(button("Use fingerprint / face", v -> promptFingerprint()));
+                col.addView(button("Use PIN instead",
+                        v -> { prefs.setLockMethod(0); showVault(); }));
+            } else {
+                buildPinPad(col, "Enter your PIN", false);
+                if (bio && names.size() == 1) {
+                    col.addView(button("Use fingerprint / face", v -> promptFingerprint()));
+                }
             }
         } else {
             List<VideoItem> items = Vault.list(this);
             col.addView(bigText(items.size() + " private videos"));
+            col.addView(sectionLabel("Vault security"));
+            col.addView(row(R.drawable.ic_nav_vault, "Password unlock",
+                    prefs.pwdHash() != null ? "On — tap to change or remove" : "Not set — tap to set",
+                    "›", v -> setPasswordDialog()));
+            col.addView(row(R.drawable.ic_nav_vault, "Pattern unlock",
+                    prefs.patternHash() != null ? "On — tap to change or remove" : "Not set — tap to set",
+                    "›", v -> setPatternDialog()));
+            col.addView(row(R.drawable.ic_nav_vault, "Fingerprint / Face unlock",
+                    prefs.fingerprintUnlock() ? "On — tap to turn off" : "Off — tap to turn on",
+                    "›", v -> {
+                        prefs.setFingerprintUnlock(!prefs.fingerprintUnlock());
+                        showVault();
+                    }));
+            col.addView(sectionLabel("Videos"));
             if (items.isEmpty()) {
                 col.addView(dimText("Nothing here yet. Long-press any video in the library "
                         + "and choose \u201CMove to Private Vault\u201D."));
@@ -1738,7 +1908,14 @@ public class MainActivity extends Activity {
             android.hardware.biometrics.BiometricManager bm =
                     (android.hardware.biometrics.BiometricManager)
                             getSystemService(android.content.Context.BIOMETRIC_SERVICE);
-            return bm != null && bm.canAuthenticate()
+            if (bm == null) return false;
+            if (Build.VERSION.SDK_INT >= 30) {
+                // WEAK includes face unlock on phones that expose it to apps
+                return bm.canAuthenticate(
+                        android.hardware.biometrics.BiometricManager.Authenticators.BIOMETRIC_WEAK)
+                        == android.hardware.biometrics.BiometricManager.BIOMETRIC_SUCCESS;
+            }
+            return bm.canAuthenticate()
                     == android.hardware.biometrics.BiometricManager.BIOMETRIC_SUCCESS;
         } catch (Exception e) {
             return false;
@@ -1748,12 +1925,16 @@ public class MainActivity extends Activity {
     private void promptFingerprint() {
         if (Build.VERSION.SDK_INT < 28) return;
         try {
-            android.hardware.biometrics.BiometricPrompt prompt =
+            android.hardware.biometrics.BiometricPrompt.Builder bb =
                     new android.hardware.biometrics.BiometricPrompt.Builder(this)
                             .setTitle("Unlock Private Vault")
-                            .setSubtitle("TM Player")
-                            .setNegativeButton("Use PIN", getMainExecutor(), (d, w) -> {})
-                            .build();
+                            .setSubtitle("Fingerprint or face")
+                            .setNegativeButton("Use PIN", getMainExecutor(), (d, w) -> {});
+            if (Build.VERSION.SDK_INT >= 30) {
+                bb.setAllowedAuthenticators(
+                        android.hardware.biometrics.BiometricManager.Authenticators.BIOMETRIC_WEAK);
+            }
+            android.hardware.biometrics.BiometricPrompt prompt = bb.build();
             prompt.authenticate(new android.os.CancellationSignal(), getMainExecutor(),
                     new android.hardware.biometrics.BiometricPrompt.AuthenticationCallback() {
                         @Override
@@ -1770,8 +1951,303 @@ public class MainActivity extends Activity {
                         }
                     });
         } catch (Exception e) {
-            toast("Fingerprint not available");
+            toast("Biometric unlock not available");
         }
+    }
+
+    // ------------------------------------------------ password + pattern unlock
+
+    private void buildPasswordUnlock(LinearLayout col) {
+        col.addView(dimText("Enter your vault password."));
+        EditText et = new EditText(this);
+        et.setHint("Password");
+        et.setSingleLine(true);
+        et.setInputType(android.text.InputType.TYPE_CLASS_TEXT
+                | android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        et.setTextColor(cText);
+        et.setHintTextColor(cDim);
+        et.setPadding(dp(4), dp(10), dp(4), dp(10));
+        col.addView(et);
+        col.addView(button("Unlock", v -> {
+            if (prefs.pwdHash() != null
+                    && Vault.hashPin(et.getText().toString()).equals(prefs.pwdHash())) {
+                vaultUnlocked = true;
+                updateNavStyles();
+                showVault();
+            } else {
+                toast("Wrong password");
+            }
+        }));
+    }
+
+    /** 3x3 pattern lock view: finger connects the dots (standard midpoint rule). */
+    final class PatternView extends View {
+        interface Listener { boolean onPattern(String pattern); }
+        Listener listener;
+        final ArrayList<Integer> sel = new ArrayList<>();
+        float fingerX = -1, fingerY = -1;
+        final Paint pDot = new Paint(Paint.ANTI_ALIAS_FLAG);
+        final Paint pLine = new Paint(Paint.ANTI_ALIAS_FLAG);
+
+        PatternView() {
+            super(MainActivity.this);
+            pLine.setStrokeWidth(dp(6));
+            pLine.setStrokeCap(Paint.Cap.ROUND);
+        }
+        float cell() { return Math.min(getWidth(), getHeight()) / 3f; }
+        float cx(int i) { return cell() * ((i % 3) + 0.5f); }
+        float cy(int i) { return cell() * ((i / 3) + 0.5f); }
+        void clearPattern() { sel.clear(); fingerX = fingerY = -1; invalidate(); }
+
+        @Override protected void onDraw(Canvas cv) {
+            super.onDraw(cv);
+            float cs = cell();
+            pLine.setColor(cAccent);
+            for (int k = 1; k < sel.size(); k++) {
+                cv.drawLine(cx(sel.get(k - 1)), cy(sel.get(k - 1)),
+                        cx(sel.get(k)), cy(sel.get(k)), pLine);
+            }
+            if (!sel.isEmpty() && fingerX >= 0) {
+                int last = sel.get(sel.size() - 1);
+                cv.drawLine(cx(last), cy(last), fingerX, fingerY, pLine);
+            }
+            for (int i = 0; i < 9; i++) {
+                boolean on = sel.contains(i);
+                pDot.setColor(on ? cAccent : cCard2);
+                cv.drawCircle(cx(i), cy(i), on ? cs * 0.16f : cs * 0.11f, pDot);
+                if (on) {
+                    pDot.setColor(cCard2);
+                    cv.drawCircle(cx(i), cy(i), cs * 0.07f, pDot);
+                }
+            }
+        }
+
+        int hit(float x, float y) {
+            float cs = cell();
+            for (int i = 0; i < 9; i++) {
+                if (Math.hypot(x - cx(i), y - cy(i)) < cs * 0.42f) return i;
+            }
+            return -1;
+        }
+
+        void addDot(int i) {
+            if (sel.contains(i)) return;
+            if (!sel.isEmpty()) {
+                int last = sel.get(sel.size() - 1);
+                int sumR = last / 3 + i / 3, sumC = last % 3 + i % 3;
+                if (sumR % 2 == 0 && sumC % 2 == 0) {
+                    int mid = (sumR / 2) * 3 + (sumC / 2);
+                    if (mid != last && mid != i && !sel.contains(mid)) sel.add(mid);
+                }
+            }
+            sel.add(i);
+        }
+
+        String patternString() {
+            StringBuilder sb = new StringBuilder();
+            for (int i : sel) {
+                if (sb.length() > 0) sb.append('-');
+                sb.append(i);
+            }
+            return sb.toString();
+        }
+
+        @Override public boolean onTouchEvent(MotionEvent e) {
+            switch (e.getAction()) {
+                case MotionEvent.ACTION_DOWN:
+                    if (getParent() != null) {
+                        getParent().requestDisallowInterceptTouchEvent(true);
+                    }
+                    sel.clear();
+                    fingerX = e.getX();
+                    fingerY = e.getY();
+                    int h = hit(fingerX, fingerY);
+                    if (h >= 0) addDot(h);
+                    invalidate();
+                    return true;
+                case MotionEvent.ACTION_MOVE:
+                    fingerX = e.getX();
+                    fingerY = e.getY();
+                    int h2 = hit(fingerX, fingerY);
+                    if (h2 >= 0) addDot(h2);
+                    invalidate();
+                    return true;
+                case MotionEvent.ACTION_UP:
+                    if (getParent() != null) {
+                        getParent().requestDisallowInterceptTouchEvent(false);
+                    }
+                    fingerX = fingerY = -1;
+                    if (listener != null && !sel.isEmpty()) {
+                        if (!listener.onPattern(patternString())) clearPattern();
+                    } else {
+                        clearPattern();
+                    }
+                    invalidate();
+                    return true;
+                default:
+                    return true;
+            }
+        }
+    }
+
+    private void buildPatternUnlock(LinearLayout col) {
+        col.addView(dimText("Draw your pattern to open the vault (at least 4 dots)."));
+        PatternView pv = new PatternView();
+        pv.listener = pat -> {
+            if (pat.split("-").length < 4) {
+                toast("Pattern too short");
+                return false;
+            }
+            if (prefs.patternHash() != null
+                    && Vault.hashPin(pat).equals(prefs.patternHash())) {
+                vaultUnlocked = true;
+                updateNavStyles();
+                showVault();
+                return true;
+            }
+            toast("Wrong pattern");
+            return false;
+        };
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(300), dp(300));
+        lp.gravity = Gravity.CENTER_HORIZONTAL;
+        lp.topMargin = dp(10);
+        col.addView(pv, lp);
+    }
+
+    private EditText pinField(String hint) {
+        EditText et = new EditText(this);
+        et.setHint(hint);
+        et.setSingleLine(true);
+        et.setInputType(android.text.InputType.TYPE_CLASS_NUMBER
+                | android.text.InputType.TYPE_NUMBER_VARIATION_PASSWORD);
+        return et;
+    }
+
+    private EditText pwdField(String hint) {
+        EditText et = new EditText(this);
+        et.setHint(hint);
+        et.setSingleLine(true);
+        et.setInputType(android.text.InputType.TYPE_CLASS_TEXT
+                | android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        return et;
+    }
+
+    private void setPasswordDialog() {
+        if (prefs.pinHash() == null) {
+            toast("Set a vault PIN first");
+            return;
+        }
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(dp(20), dp(8), dp(20), 0);
+        EditText cur = pinField("Current PIN");
+        box.addView(cur);
+        EditText nw = pwdField("New password (min 4 characters)");
+        box.addView(nw);
+        EditText cf = pwdField("Repeat new password");
+        box.addView(cf);
+        AlertDialog.Builder b = new AlertDialog.Builder(this)
+                .setTitle(prefs.pwdHash() != null ? "Change vault password" : "Set vault password")
+                .setView(box)
+                .setPositiveButton("Save", (d, w) -> {
+                    if (!Vault.hashPin(cur.getText().toString()).equals(prefs.pinHash())) {
+                        toast("Current PIN is wrong");
+                        return;
+                    }
+                    String p1 = nw.getText().toString();
+                    if (p1.length() < 4) {
+                        toast("Password must be at least 4 characters");
+                        return;
+                    }
+                    if (!p1.equals(cf.getText().toString())) {
+                        toast("Passwords do not match");
+                        return;
+                    }
+                    prefs.setPwdHash(Vault.hashPin(p1));
+                    toast("Vault password set");
+                    if (vaultUnlocked) showVault();
+                })
+                .setNegativeButton("Cancel", null);
+        if (prefs.pwdHash() != null) {
+            b.setNeutralButton("Remove", (d, w) -> {
+                if (!Vault.hashPin(cur.getText().toString()).equals(prefs.pinHash())) {
+                    toast("Current PIN is wrong");
+                    return;
+                }
+                prefs.setPwdHash(null);
+                if (prefs.lockMethod() == 1) prefs.setLockMethod(0);
+                toast("Password unlock removed");
+                if (vaultUnlocked) showVault();
+            });
+        }
+        b.show();
+    }
+
+    private void setPatternDialog() {
+        if (prefs.pinHash() == null) {
+            toast("Set a vault PIN first");
+            return;
+        }
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(dp(20), dp(8), dp(20), 0);
+        EditText cur = pinField("Current PIN");
+        box.addView(cur);
+        TextView status = new TextView(this);
+        status.setText("Draw a pattern (at least 4 dots)");
+        status.setTextColor(cDim);
+        status.setPadding(0, dp(12), 0, dp(4));
+        box.addView(status);
+        PatternView pv = new PatternView();
+        LinearLayout.LayoutParams plp = new LinearLayout.LayoutParams(dp(260), dp(260));
+        plp.gravity = Gravity.CENTER_HORIZONTAL;
+        box.addView(pv, plp);
+        AlertDialog.Builder b = new AlertDialog.Builder(this)
+                .setTitle(prefs.patternHash() != null ? "Change vault pattern" : "Set vault pattern")
+                .setView(box)
+                .setNegativeButton("Cancel", null);
+        if (prefs.patternHash() != null) {
+            b.setNeutralButton("Remove", (d, w) -> {
+                if (!Vault.hashPin(cur.getText().toString()).equals(prefs.pinHash())) {
+                    toast("Current PIN is wrong");
+                    return;
+                }
+                prefs.setPatternHash(null);
+                if (prefs.lockMethod() == 2) prefs.setLockMethod(0);
+                toast("Pattern unlock removed");
+                if (vaultUnlocked) showVault();
+            });
+        }
+        final AlertDialog dlg = b.create();
+        final String[] first = {null};
+        pv.listener = pat -> {
+            if (pat.split("-").length < 4) {
+                toast("Pattern too short — use at least 4 dots");
+                return false;
+            }
+            if (first[0] == null) {
+                first[0] = pat;
+                status.setText("Draw the same pattern again to confirm");
+                return false;
+            }
+            if (!first[0].equals(pat)) {
+                first[0] = null;
+                status.setText("Patterns do not match — draw again");
+                return false;
+            }
+            if (!Vault.hashPin(cur.getText().toString()).equals(prefs.pinHash())) {
+                toast("Current PIN is wrong");
+                first[0] = null;
+                status.setText("Draw a pattern (at least 4 dots)");
+                return false;
+            }
+            prefs.setPatternHash(Vault.hashPin(pat));
+            toast("Pattern unlock set");
+            dlg.dismiss();
+            if (vaultUnlocked) showVault();
+            return true;
+        };
+        dlg.show();
     }
 
     // ------------------------------------------------------------ music
@@ -2047,6 +2523,7 @@ public class MainActivity extends Activity {
             case "trash": buildTrashPage(col); break;
             case "converter": buildConverterPage(col); break;
             case "clean": buildCleanPage(col); break;
+            case "openfrom": buildOpenFromPage(col); break;
             default: buildMeHome(col); break;
         }
         sv.addView(col);
@@ -2058,9 +2535,12 @@ public class MainActivity extends Activity {
         LinearLayout card = new LinearLayout(this);
         card.setOrientation(LinearLayout.HORIZONTAL);
         card.setGravity(Gravity.CENTER_VERTICAL);
-        GradientDrawable cg = new GradientDrawable();
+        GradientDrawable cg = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
+                prefs.isDark(this)
+                        ? new int[]{0xFF1B2B4D, 0xFF0F2E40}
+                        : new int[]{0xFFFFFFFF, 0xFFE8EEF6});
         cg.setCornerRadius(dp(16));
-        cg.setColor(cCard);
+        if (prefs.isDark(this)) cg.setStroke(dp(1), 0x665C7CFC);
         card.setBackground(cg);
         card.setPadding(dp(16), dp(16), dp(16), dp(16));
         LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(
@@ -2106,13 +2586,25 @@ public class MainActivity extends Activity {
                 {R.drawable.ic_nav_settings, "Theme", (Runnable) () -> { mePage = "theme"; showMe(); }},
         }));
         col.addView(tileRow(new Object[][]{
+                {R.drawable.ic_nav_browser, "Browser", (Runnable) () -> startActivity(new Intent(this, BrowserActivity.class))},
                 {R.drawable.ic_nav_folders, "Media Manage", (Runnable) () -> { mePage = "media"; showMe(); }},
                 {R.drawable.ic_history, "History", (Runnable) () -> { mePage = "history"; showMe(); }},
                 {R.drawable.ic_clean, "Clean", (Runnable) () -> { mePage = "clean"; cleanScanned = false; showMe(); }},
-                {R.drawable.ic_trash, "Recycle Bin", (Runnable) () -> { mePage = "trash"; showMe(); }},
         }));
 
         col.addView(sectionLabel("More"));
+        col.addView(row(R.drawable.ic_assistant, "AI Assistant",
+                "Private chat — works with your own API key", "›",
+                v -> startActivity(new Intent(this, AssistantActivity.class))));
+        col.addView(row(R.drawable.ic_qr, "QR Scanner",
+                "Scan QR codes with the camera", "›",
+                v -> startActivity(new Intent(this, ScannerActivity.class))));
+        col.addView(row(R.drawable.ic_doc, "TM Documents Reader",
+                "Read PDFs + merge, split, compress & more tools", "›",
+                v -> startActivity(new Intent(this, DocumentsActivity.class))));
+        col.addView(row(R.drawable.ic_nav_folders, "Open From",
+                "Internal, SD/USB, folder picker, stream URL", "›",
+                v -> { mePage = "openfrom"; showMe(); }));
         col.addView(row(R.drawable.ic_nav_settings, "Settings", "Appearance, playback, library, privacy", "›",
                 v -> { mePage = "settings"; settingsSection = 0; showMe(); }));
         long trashSize = TrashBin.totalSize(this);
@@ -2150,15 +2642,19 @@ public class MainActivity extends Activity {
             tile.setGravity(Gravity.CENTER_HORIZONTAL);
             tile.setPadding(dp(2), dp(6), dp(2), dp(6));
             FrameLayout box = new FrameLayout(this);
+            int pack = prefs.iconPack();
             GradientDrawable bg = new GradientDrawable();
             bg.setCornerRadius(dp(14));
-            bg.setColor(cCard);
+            if (pack == 1) bg.setColor(cAccent);       // Material You: filled accent
+            else if (pack == 2) bg.setColor(0x00000000); // Flat Minimal: no box
+            else bg.setColor(cCard);                    // Aero Neon: card + outline glyph
             box.setBackground(bg);
             box.setLayoutParams(new LinearLayout.LayoutParams(dp(54), dp(54)));
             ImageView iv = new ImageView(this);
             iv.setImageResource(icon);
-            iv.setColorFilter(cAccent);
-            FrameLayout.LayoutParams ilp = new FrameLayout.LayoutParams(dp(27), dp(27));
+            iv.setColorFilter(pack == 1 ? 0xFF0B1220 : cAccent);
+            int iconSz = pack == 2 ? 32 : 27;
+            FrameLayout.LayoutParams ilp = new FrameLayout.LayoutParams(dp(iconSz), dp(iconSz));
             ilp.gravity = Gravity.CENTER;
             iv.setLayoutParams(ilp);
             box.addView(iv);
@@ -2220,7 +2716,9 @@ public class MainActivity extends Activity {
         final String name;
         final boolean dark;
         final int accent;
-        ThemeDef(String n, boolean d, int a) { name = n; dark = d; accent = a; }
+        final boolean hc; // high-contrast (AMOLED black)
+        ThemeDef(String n, boolean d, int a) { this(n, d, a, false); }
+        ThemeDef(String n, boolean d, int a, boolean h) { name = n; dark = d; accent = a; hc = h; }
     }
 
     private void buildThemePage(LinearLayout col) {
@@ -2235,6 +2733,12 @@ public class MainActivity extends Activity {
         themes.add(new ThemeDef("Sunset", true, 0xFFF97316));
         themes.add(new ThemeDef("Rose", true, 0xFFEC4899));
         themes.add(new ThemeDef("Golden", true, 0xFFF5B921));
+        themes.add(new ThemeDef("Midnight Teal", true, 0xFF3DBFA8));
+        themes.add(new ThemeDef("Midnight AMOLED", true, 0xFF22C07A, true));
+        themes.add(new ThemeDef("Neon Glow", true, 0xFF8B5CF6));
+        themes.add(new ThemeDef("Forest Green", true, 0xFF43A047));
+        themes.add(new ThemeDef("Carbon Fiber", true, 0xFF90A4AE));
+        themes.add(new ThemeDef("Clean Light", false, 0xFF3B82F6));
 
         // Customize card first (PLAYit puts it first too)
         LinearLayout gridHost = new LinearLayout(this);
@@ -2245,13 +2749,15 @@ public class MainActivity extends Activity {
                 v -> { mePage = "settings"; settingsSection = 1; showMe(); });
         cards.add(customize);
         for (ThemeDef t : themes) {
-            boolean sel = prefs.darkTheme() == t.dark && prefs.accent() == t.accent;
+            boolean sel = prefs.darkTheme() == t.dark && prefs.accent() == t.accent
+                    && prefs.highContrast() == t.hc;
             int top = blend(t.accent, t.dark ? 0xFF0A0F1C : 0xFFFFFFFF, t.dark ? 0.45f : 0.25f);
             int bottom = t.dark ? 0xFF0A0F1C : 0xFFE8EEF6;
             cards.add(themeCard(t.name, top, bottom, sel, false, v -> {
                 prefs.setAccentColor(t.accent);
                 prefs.setDarkTheme(t.dark);
                 prefs.setThemeMode(t.dark ? 2 : 1);
+                prefs.setHighContrast(t.hc);
                 recreate();
             }));
         }
@@ -2269,6 +2775,147 @@ public class MainActivity extends Activity {
         col.addView(gridHost);
         col.addView(dimText("All themes are free — no VIP, no ads. Customize Theme lets you "
                 + "pick any accent color, light or dark, and text size."));
+
+        col.addView(sectionLabel("Customize"));
+        col.addView(row(0, "Custom accent color",
+                "Color wheel + preset swatches — any color you like",
+                String.format("#%06X", prefs.accent() & 0xFFFFFF) + " ›",
+                v -> showAccentPicker()));
+        col.addView(dimText("Icon pack"));
+        col.addView(chips(new String[]{"Aero Neon", "Material You", "Flat Minimal"},
+                prefs.iconPack(),
+                i -> { prefs.setIconPack(i); recreate(); }));
+        if (Build.VERSION.SDK_INT >= 31) {
+            col.addView(toggleRow("Material You dynamic color",
+                    "Use colors from your wallpaper (Android 12+)",
+                    prefs.dynamicColor(),
+                    v -> { prefs.setDynamicColor(!prefs.dynamicColor()); recreate(); }));
+        }
+    }
+
+    // ------------------------------------------------- custom accent picker
+    /** Small HSV picker: saturation/value square + hue strip. */
+    static final class HsvPickerView extends View {
+        interface OnColorChanged { void onColor(int argb); }
+        final float[] hsv = new float[3];
+        OnColorChanged listener;
+        private boolean dragHue;
+        HsvPickerView(android.content.Context ctx, int argb) {
+            super(ctx);
+            android.graphics.Color.colorToHSV(argb, hsv);
+        }
+        int color() { return android.graphics.Color.HSVToColor(hsv); }
+        void setColor(int argb) {
+            android.graphics.Color.colorToHSV(argb, hsv);
+            invalidate();
+            if (listener != null) listener.onColor(color());
+        }
+        private float stripH() { return 46 * getResources().getDisplayMetrics().density; }
+        private float gap() { return 14 * getResources().getDisplayMetrics().density; }
+        @Override protected void onDraw(android.graphics.Canvas cv) {
+            float w = getWidth(), sq = Math.min(w, getHeight() - stripH() - gap());
+            float x0 = (w - sq) / 2f;
+            android.graphics.Paint p = new android.graphics.Paint();
+            int pure = android.graphics.Color.HSVToColor(new float[]{hsv[0], 1f, 1f});
+            android.graphics.Shader sh1 = new android.graphics.LinearGradient(
+                    x0, 0, x0 + sq, 0, 0xFFFFFFFF, pure, android.graphics.Shader.TileMode.CLAMP);
+            p.setShader(sh1);
+            cv.drawRect(x0, 0, x0 + sq, sq, p);
+            android.graphics.Shader sh2 = new android.graphics.LinearGradient(
+                    0, 0, 0, sq, 0x00000000, 0xFF000000, android.graphics.Shader.TileMode.CLAMP);
+            p.setShader(sh2);
+            cv.drawRect(x0, 0, x0 + sq, sq, p);
+            p.setShader(null);
+            float cx = x0 + hsv[1] * sq, cy = (1f - hsv[2]) * sq;
+            p.setStyle(android.graphics.Paint.Style.STROKE);
+            p.setStrokeWidth(3 * getResources().getDisplayMetrics().density);
+            p.setColor(0xFFFFFFFF);
+            cv.drawCircle(cx, cy, 12 * getResources().getDisplayMetrics().density, p);
+            // hue strip
+            float y0 = sq + gap(), hh = stripH();
+            for (int i = 0; i < 360; i += 4) {
+                p.setStyle(android.graphics.Paint.Style.FILL);
+                p.setColor(android.graphics.Color.HSVToColor(new float[]{i, 1f, 1f}));
+                float sx = x0 + sq * i / 360f;
+                cv.drawRect(sx, y0, x0 + sq * (i + 4) / 360f + 1, y0 + hh, p);
+            }
+            p.setStyle(android.graphics.Paint.Style.STROKE);
+            p.setColor(0xFFFFFFFF);
+            float hx = x0 + sq * hsv[0] / 360f;
+            cv.drawRect(hx - 3 * getResources().getDisplayMetrics().density, y0 - 3,
+                    hx + 3 * getResources().getDisplayMetrics().density, y0 + hh + 3, p);
+        }
+        @Override public boolean onTouchEvent(android.view.MotionEvent e) {
+            float w = getWidth(), sq = Math.min(w, getHeight() - stripH() - gap());
+            float x0 = (w - sq) / 2f;
+            float x = e.getX(), y = e.getY();
+            if (e.getAction() == android.view.MotionEvent.ACTION_DOWN) {
+                dragHue = y > sq + gap() / 2f;
+                getParent().requestDisallowInterceptTouchEvent(true);
+            }
+            if (e.getAction() == android.view.MotionEvent.ACTION_UP) {
+                getParent().requestDisallowInterceptTouchEvent(false);
+            }
+            if (dragHue) {
+                hsv[0] = Math.max(0, Math.min(359.9f, (x - x0) / sq * 360f));
+            } else {
+                hsv[1] = Math.max(0, Math.min(1f, (x - x0) / sq));
+                hsv[2] = Math.max(0, Math.min(1f, 1f - y / sq));
+            }
+            invalidate();
+            if (listener != null) listener.onColor(color());
+            return true;
+        }
+    }
+
+    private void showAccentPicker() {
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(dp(20), dp(10), dp(20), 0);
+        final HsvPickerView wheel = new HsvPickerView(this, prefs.accent());
+        box.addView(wheel, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(320)));
+        final TextView hexTv = new TextView(this);
+        hexTv.setTextSize(15f);
+        hexTv.setTextColor(cText);
+        hexTv.setGravity(Gravity.CENTER);
+        hexTv.setPadding(0, dp(10), 0, dp(4));
+        hexTv.setText(String.format("#%06X", prefs.accent() & 0xFFFFFF));
+        box.addView(hexTv);
+        wheel.listener = c -> hexTv.setText(String.format("#%06X", c & 0xFFFFFF));
+        int[] palette = {0xFFF44336, 0xFFFF5722, 0xFFFF9800, 0xFFFFC107, 0xFFFFEB3B,
+                0xFF8BC34A, 0xFF4CAF50, 0xFF009688, 0xFF19C8E8, 0xFF2196F3,
+                0xFF3F51B5, 0xFF9C27B0, 0xFF673AB7, 0xFFE91E63, 0xFFF06292,
+                0xFF22C07A, 0xFFFFFFFF, 0xFFBDBDBD, 0xFF607D8B, 0xFF455A64};
+        for (int r = 0; r < 2; r++) {
+            LinearLayout rowL = new LinearLayout(this);
+            rowL.setGravity(Gravity.CENTER);
+            rowL.setPadding(0, dp(6), 0, 0);
+            for (int k = 0; k < 10; k++) {
+                final int c = palette[r * 10 + k];
+                TextView dot = new TextView(this);
+                GradientDrawable gd = new GradientDrawable();
+                gd.setShape(GradientDrawable.OVAL);
+                gd.setColor(c);
+                gd.setStroke(dp(1), 0x33000000);
+                dot.setBackground(gd);
+                LinearLayout.LayoutParams dlp = new LinearLayout.LayoutParams(dp(30), dp(30));
+                dlp.setMargins(dp(4), 0, dp(4), 0);
+                dot.setLayoutParams(dlp);
+                dot.setOnClickListener(v -> wheel.setColor(c));
+                rowL.addView(dot);
+            }
+            box.addView(rowL);
+        }
+        new android.app.AlertDialog.Builder(this)
+                .setTitle("Custom accent color")
+                .setView(box)
+                .setPositiveButton("Apply", (d, w) -> {
+                    prefs.setAccentColor(wheel.color());
+                    recreate();
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
     }
 
     private int blend(int a, int b, float t) {
@@ -2327,6 +2974,60 @@ public class MainActivity extends Activity {
         label.setPadding(dp(2), dp(6), dp(2), dp(8));
         wrap.addView(label);
         return wrap;
+    }
+
+    // ------------------------------------------------------------ Open From page
+    private void buildOpenFromPage(LinearLayout col) {
+        col.addView(backRow("Me", v -> { mePage = "home"; showMe(); }));
+        col.addView(bigText("Open From"));
+        col.addView(row(R.drawable.ic_nav_folders, "Internal Storage",
+                "Browse this phone's folders", "›",
+                v -> { videoSub = 1; showTab(0); }));
+        col.addView(row(R.drawable.ic_nav_folders, "SD Card / USB",
+                "Folders on every mounted volume", "›",
+                v -> { videoSub = 1; showTab(0); }));
+        col.addView(row(R.drawable.ic_nav_folders, "Folder (device picker)",
+                "Pick any folder with the system picker", "›",
+                v -> { videoSub = 3; showTab(0); }));
+        col.addView(row(R.drawable.ic_nav_browser, "URL (stream link)",
+                "Play a direct http(s) media link", "›",
+                v -> showUrlDialog()));
+        col.addView(row(R.drawable.ic_nav_browser, "Network (UPnP / SMB)",
+                "Not in this build — home-network streaming is not supported yet", "",
+                v -> toast("Network streaming is not supported in this build")));
+        col.addView(dimText("Tip: the Folders view lists internal storage, SD card and "
+                + "USB drives together, volume by volume."));
+    }
+
+    private void showUrlDialog() {
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(dp(20), dp(8), dp(20), 0);
+        final android.widget.EditText urlIn = new android.widget.EditText(this);
+        urlIn.setHint("https://example.com/video.mp4");
+        urlIn.setSingleLine(true);
+        urlIn.setTextColor(cText);
+        urlIn.setHintTextColor(cDim);
+        box.addView(urlIn);
+        new android.app.AlertDialog.Builder(this)
+                .setTitle("Open stream URL")
+                .setView(box)
+                .setPositiveButton("Play", (d, w) -> {
+                    String u = urlIn.getText().toString().trim();
+                    if (!u.startsWith("http://") && !u.startsWith("https://")) {
+                        toast("Enter a valid http(s) link");
+                        return;
+                    }
+                    VideoItem it = new VideoItem();
+                    it.uriStr = u;
+                    String seg = u.substring(u.lastIndexOf('/') + 1);
+                    it.name = seg.isEmpty() ? u : seg;
+                    List<VideoItem> one = new ArrayList<>();
+                    one.add(it);
+                    playFrom(one, 0);
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
     }
 
     // ------------------------------------------------------------ Media Manage page
@@ -3194,10 +3895,16 @@ public class MainActivity extends Activity {
             }
             case 7: {
                 col.addView(bigText("General"));
-                col.addView(dimText("Vault fingerprint unlock"));
+                col.addView(dimText("Vault fingerprint / face unlock"));
                 col.addView(chips(new String[]{"Off", "On"}, prefs.fingerprintUnlock() ? 1 : 0,
                         i -> prefs.setFingerprintUnlock(i == 1)));
+                col.addView(toggleRow("Auto-check for updates",
+                        "Look for a new TM Player version when the app opens (about once a day)",
+                        prefs.updateAuto(),
+                        v -> { prefs.setUpdateAuto(!prefs.updateAuto()); showMe(); }));
                 col.addView(button("Change vault PIN", v -> changePinDialog()));
+                col.addView(button("Set / change vault password", v -> setPasswordDialog()));
+                col.addView(button("Set / change vault pattern", v -> setPatternDialog()));
                 col.addView(sectionLabel("User data"));
                 col.addView(button("Clear watch history", v -> {
                     prefs.clearHistory();
@@ -3237,7 +3944,8 @@ public class MainActivity extends Activity {
                 bn.setTypeface(null, android.graphics.Typeface.BOLD);
                 btxt.addView(bn);
                 TextView bv = new TextView(this);
-                bv.setText("Version 0.1 • by MD. Muklash Mia");
+                bv.setText("Version " + UpdateProvider.versionName(this)
+                        + " • by MD. Muklash Mia");
                 bv.setTextColor(cDim);
                 bv.setTextSize(13f);
                 btxt.addView(bv);
@@ -3273,7 +3981,8 @@ public class MainActivity extends Activity {
                 col.addView(button("Telegram  @muklash_dev", v -> openUrl("https://t.me/muklash_dev")));
                 col.addView(button("GitHub  Muklash-Dev", v -> openUrl("https://github.com/Muklash-Dev")));
                 col.addView(button("About TM Player", v -> showAbout()));
-                col.addView(dimText("No third-party libraries — built with Android framework APIs only. Ads-free and open source."));
+                col.addView(button("Check for updates", v -> Updater.check(this, true)));
+                col.addView(dimText("Built on Android framework APIs, plus ZXing (Apache 2.0) for QR scanning. Ads-free and open source."));
                 break;
             }
         }
@@ -3428,19 +4137,30 @@ public class MainActivity extends Activity {
     }
 
     private View button(String label, View.OnClickListener click) {
+        // Normal dark card row; only while it is being tapped does it take the
+        // accent color (his rule: the tapped one is colored, the rest stay normal).
         TextView b = new TextView(this);
         b.setText(label);
-        b.setTextColor(0xFFFFFFFF);
         b.setTextSize(14.5f);
-        b.setGravity(Gravity.CENTER);
-        b.setPadding(dp(16), dp(12), dp(16), dp(12));
-        GradientDrawable g = new GradientDrawable();
-        g.setCornerRadius(dp(12));
-        g.setColor(cAccent);
-        b.setBackground(g);
+        b.setGravity(Gravity.CENTER_VERTICAL);
+        b.setPadding(dp(16), dp(14), dp(16), dp(14));
+        GradientDrawable normal = new GradientDrawable();
+        normal.setCornerRadius(dp(16));
+        normal.setColor(cCard);
+        GradientDrawable pressed = new GradientDrawable();
+        pressed.setCornerRadius(dp(16));
+        pressed.setColor(cAccent);
+        android.graphics.drawable.StateListDrawable sd =
+                new android.graphics.drawable.StateListDrawable();
+        sd.addState(new int[]{android.R.attr.state_pressed}, pressed);
+        sd.addState(new int[]{}, normal);
+        b.setBackground(sd);
+        b.setTextColor(new android.content.res.ColorStateList(
+                new int[][]{{android.R.attr.state_pressed}, {}},
+                new int[]{0xFF0B1220, cText}));
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        lp.setMargins(dp(16), dp(8), dp(16), dp(4));
+        lp.setMargins(dp(16), dp(6), dp(16), dp(6));
         b.setLayoutParams(lp);
         b.setOnClickListener(click);
         return b;

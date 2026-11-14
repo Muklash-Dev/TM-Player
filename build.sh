@@ -29,10 +29,11 @@ rm -rf "$WORK"; mkdir -p "$WORK" "$OUT"
     --java "$WORK/gen" "$WORK/res.zip"
 # 3) Compile Java
 find "$SRC/java" "$WORK/gen" -name '*.java' > "$WORK/sources.txt"
-javac -encoding UTF-8 -source 17 -target 17 -cp "$AJAR" -d "$WORK/classes" @"$WORK/sources.txt"
+ZXING="$ROOT/libs/zxing-core.jar"
+javac -encoding UTF-8 -source 17 -target 17 -cp "$AJAR:$ZXING" -d "$WORK/classes" @"$WORK/sources.txt"
 # 4) Dex (app classes only — the browser uses the system WebView engine)
 mkdir -p "$WORK/dex"
-"$BT/d8" --release --min-api 26 --output "$WORK/dex" $(find "$WORK/classes" -name '*.class')
+"$BT/d8" --release --min-api 26 --output "$WORK/dex" $(find "$WORK/classes" -name '*.class') "$ZXING"
 # 5) Package dex into the APK
 cp "$WORK/unsigned.apk" "$WORK/packaged.apk"
 ( cd "$WORK" && for d in dex/classes*.dex; do zip -q packaged.apk -j "$d"; done )
